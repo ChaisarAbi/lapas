@@ -118,7 +118,10 @@ composer install --no-dev --optimize-autoloader
 
 ### **3.4 Konfigurasi Environment**
 ```bash
-cp env .env
+# Copy file env example
+cp .env.example .env
+
+# Edit file .env
 nano .env
 ```
 
@@ -137,10 +140,12 @@ database.default.username = spk_user
 database.default.password = 'password_anda'
 database.default.DBDriver = MySQLi
 database.default.DBPrefix = ''
-
-# Session
-session.savePath = WRITEPATH . 'session'
+database.default.port = 3306
+database.default.charset = utf8mb4
+database.default.DBCollat = utf8mb4_general_ci
 ```
+
+**CATATAN PENTING:** Jangan tambahkan baris `session.savePath = WRITEPATH . 'session'` di file `.env` karena sudah ada di konfigurasi default CodeIgniter 4. Jika ditambahkan, akan menyebabkan error parsing.
 
 ### **3.5 Generate Encryption Key**
 ```bash
@@ -415,6 +420,39 @@ cat /var/www/spk-pembinaan/.env | grep database
 # Check session directory permissions
 sudo chmod 775 /var/www/spk-pembinaan/writable/session
 sudo chown www-data:www-data /var/www/spk-pembinaan/writable/session
+```
+
+#### **Issue 4: Error "Class CodeIgniter\Exceptions\InvalidArgumentException not found"**
+```bash
+# Penyebab: Dependencies belum terinstall dengan benar atau file .env format salah
+
+# 1. Pastikan composer dependencies sudah diinstall
+composer install --no-dev --optimize-autoloader
+
+# 2. Hapus file .env yang salah dan buat ulang
+rm .env
+cp .env.example .env
+
+# 3. Edit .env hanya dengan konfigurasi dasar (jangan tambahkan session.savePath)
+nano .env
+
+# 4. Coba jalankan spark command lagi
+php spark key:generate
+```
+
+#### **Issue 5: Error parsing .env file**
+```bash
+# Penyebab: Format .env file salah
+
+# 1. Hapus semua baris yang mengandung WRITEPATH atau konstanta PHP di .env
+sed -i '/WRITEPATH/d' .env
+sed -i '/FCPATH/d' .env
+sed -i '/APPPATH/d' .env
+
+# 2. Pastikan format .env benar:
+#    - Gunakan format: key = value
+#    - Jangan gunakan kutip ganda kecuali untuk string yang mengandung spasi
+#    - Jangan tambahkan titik koma (;) di akhir baris
 ```
 
 ### **10.2 Performance Issues**
