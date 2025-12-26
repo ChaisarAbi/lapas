@@ -22,11 +22,18 @@ class LaporanController extends BaseController
      */
     public function index()
     {
+        $periodeList = $this->laporanModel->getListPeriode();
+        
+        // Jika tidak ada periode, gunakan periode saat ini
+        if (empty($periodeList)) {
+            $periodeList = [date('Y-m')];
+        }
+        
         $data = [
             'title' => 'Manajemen Laporan',
             'page_title' => 'Manajemen Laporan',
             'dashboard_url' => 'admin/dashboard',
-            'periode_list' => $this->laporanModel->getListPeriode(),
+            'periode_list' => $periodeList,
             'petugas_list' => $this->laporanModel->getListPetugas()
         ];
         

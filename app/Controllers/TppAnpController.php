@@ -174,9 +174,10 @@ class TppAnpController extends BaseController
         // Update bobot di database
         foreach ($kriteriaIds as $index => $id) {
             $data = [
+                'id' => $id,
                 'bobot' => floatval($bobotAkhir[$index])
             ];
-            $this->kriteriaModel->update($id, $data);
+            $this->kriteriaModel->save($data);
         }
         
         return redirect()->to('/tpp/anp')->with('success', 'Bobot akhir ANP berhasil disimpan ke database!');

@@ -44,7 +44,6 @@ class KriteriaController extends BaseController
         $validation->setRules([
             'kode' => 'required|min_length[2]|max_length[10]|is_unique[kriteria.kode]',
             'nama' => 'required|min_length[3]|max_length[100]',
-            'bobot' => 'required|decimal|greater_than[0]|less_than_equal_to[1]',
             'jenis' => 'required|in_list[Benefit,Cost]'
         ], [
             'kode' => [
@@ -57,12 +56,6 @@ class KriteriaController extends BaseController
                 'required' => 'Nama kriteria harus diisi',
                 'min_length' => 'Nama minimal 3 karakter',
                 'max_length' => 'Nama maksimal 100 karakter'
-            ],
-            'bobot' => [
-                'required' => 'Bobot harus diisi',
-                'decimal' => 'Bobot harus berupa angka desimal',
-                'greater_than' => 'Bobot harus lebih dari 0',
-                'less_than_equal_to' => 'Bobot maksimal 1'
             ],
             'jenis' => [
                 'required' => 'Jenis kriteria harus dipilih',
@@ -77,7 +70,7 @@ class KriteriaController extends BaseController
         $data = [
             'kode' => $this->request->getPost('kode'),
             'nama' => $this->request->getPost('nama'),
-            'bobot' => $this->request->getPost('bobot'),
+            'bobot' => 0, // Default bobot 0, nanti diatur di menu Input Bobot
             'jenis' => $this->request->getPost('jenis')
         ];
         
@@ -119,7 +112,6 @@ class KriteriaController extends BaseController
         $validation->setRules([
             'kode' => 'required|min_length[2]|max_length[10]',
             'nama' => 'required|min_length[3]|max_length[100]',
-            'bobot' => 'required|decimal|greater_than[0]|less_than_equal_to[1]',
             'jenis' => 'required|in_list[Benefit,Cost]'
         ], [
             'kode' => [
@@ -131,12 +123,6 @@ class KriteriaController extends BaseController
                 'required' => 'Nama kriteria harus diisi',
                 'min_length' => 'Nama minimal 3 karakter',
                 'max_length' => 'Nama maksimal 100 karakter'
-            ],
-            'bobot' => [
-                'required' => 'Bobot harus diisi',
-                'decimal' => 'Bobot harus berupa angka desimal',
-                'greater_than' => 'Bobot harus lebih dari 0',
-                'less_than_equal_to' => 'Bobot maksimal 1'
             ],
             'jenis' => [
                 'required' => 'Jenis kriteria harus dipilih',
@@ -161,9 +147,14 @@ class KriteriaController extends BaseController
             'id' => $id,
             'kode' => $kode,
             'nama' => $this->request->getPost('nama'),
-            'bobot' => $this->request->getPost('bobot'),
             'jenis' => $this->request->getPost('jenis')
         ];
+        
+        // Hanya update bobot jika ada input (bobot diatur di menu Input Bobot)
+        $bobotInput = $this->request->getPost('bobot');
+        if ($bobotInput !== null && $bobotInput !== '') {
+            $data['bobot'] = $bobotInput;
+        }
         
         if ($this->kriteriaModel->save($data)) {
             return redirect()->to('/tpp/kriteria')->with('success', 'Kriteria berhasil diperbarui');

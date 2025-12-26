@@ -50,9 +50,10 @@ class TppBobotController extends BaseController
         // Update bobot untuk setiap kriteria
         foreach ($kriteriaIds as $index => $id) {
             $data = [
+                'id' => $id,
                 'bobot' => floatval($bobotData[$index])
             ];
-            $this->kriteriaModel->update($id, $data);
+            $this->kriteriaModel->save($data);
         }
         
         // Hitung total bobot baru
