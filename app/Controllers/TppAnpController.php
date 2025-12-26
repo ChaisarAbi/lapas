@@ -161,6 +161,11 @@ class TppAnpController extends BaseController
         $bobotAkhir = $this->request->getPost('bobot_akhir');
         $kriteriaIds = $this->request->getPost('kriteria_id');
         
+        // Validasi: pastikan ada data
+        if (empty($kriteriaIds) || empty($bobotAkhir)) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada data bobot yang dikirim');
+        }
+        
         // Validasi
         $validation = \Config\Services::validation();
         $validation->setRules([
@@ -171,37 +176,28 @@ class TppAnpController extends BaseController
             return redirect()->back()->withInput()->with('errors', $validation->getErrors());
         }
         
+        $updatedCount = 0;
         // Update bobot di database
         foreach ($kriteriaIds as $index => $id) {
-            $data = [
-                'id' => $id,
-                'bobot' => floatval($bobotAkhir[$index])
-            ];
-            $this->kriteriaModel->save($data);
+            // Pastikan id dan bobot valid
+            if (!empty($id) && isset($bobotAkhir[$index]) && $bobotAkhir[$index] !== '') {
+                $data = [
+                    'id' => $id,
+                    'bobot' => floatval($bobotAkhir[$index])
+                ];
+                if ($this->kriteriaModel->save($data)) {
+                    $updatedCount++;
+                }
+            }
+        }
+        
+        if ($updatedCount === 0) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada data yang berhasil diperbarui. Pastikan input valid.');
         }
         
         return redirect()->to('/tpp/anp')->with('success', 'Bobot akhir ANP berhasil disimpan ke database!');
     }
 
-    public function cetakLaporan()
-    {
-        // Ambil semua kriteria
-        $kriteria = $this->kriteriaModel->findAll();
-        
-        // Ambil matriks perbandingan dari session
-        $matriks = session()->get('matriks_perbandingan');
-        
-        // Hitung hasil ANP
-        $hasilAnp = $this->hitungANP($matriks);
-        
-        $data = [
-            'title' => 'Laporan Hasil ANP - SPK Pembinaan',
-            'kriteria' => $kriteria,
-            'matriks' => $matriks,
-            'hasilAnp' => $hasilAnp,
-            'tanggal' => date('d/m/Y H:i:s')
-        ];
-        
-        return view('tpp_anp/cetak', $data);
-    }
+    // Method cetakLaporan dihapus karena file view tidak ada
+    // dan sesuai permintaan untuk menghilangkan cetak laporan lama
 }

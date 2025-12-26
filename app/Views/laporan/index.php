@@ -22,89 +22,46 @@ $activeMenu = 'laporan';
                     
                     <div class="row">
                         <!-- Laporan Ranking -->
-                        <div class="col-md-4">
+                        <div class="col-md-12">
                             <div class="card card-primary">
                                 <div class="card-header">
-                                    <h3 class="card-title">Laporan Ranking</h3>
+                                    <h3 class="card-title">Laporan Ranking Narapidana</h3>
                                 </div>
                                 <div class="card-body">
-                                    <p>Laporan ranking narapidana berdasarkan perhitungan TOPSIS.</p>
+                                    <p>Laporan ranking narapidana berdasarkan perhitungan TOPSIS. Laporan ini menampilkan peringkat narapidana berdasarkan nilai akhir dari proses penilaian.</p>
                                     <form method="get" action="<?= base_url('admin/laporan/preview-ranking') ?>">
-                                        <div class="form-group">
-                                            <label>Periode</label>
-                                            <select name="periode" class="form-control" required>
-                                                <option value="">Pilih Periode</option>
-                                                <?php foreach ($periode_list as $p): ?>
-                                                    <option value="<?= $p ?>"><?= $p ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>Periode</label>
+                                                    <select name="periode" class="form-control" required>
+                                                        <option value="">Pilih Periode</option>
+                                                        <?php foreach ($periode_list as $p): ?>
+                                                            <option value="<?= $p ?>"><?= $p ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label>&nbsp;</label>
+                                                    <button type="submit" class="btn btn-primary btn-block">
+                                                        <i class="fas fa-eye"></i> Preview Laporan Ranking
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button type="submit" class="btn btn-primary btn-block">
-                                            <i class="fas fa-eye"></i> Preview Laporan
-                                        </button>
                                     </form>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Laporan Validasi -->
-                        <div class="col-md-4">
-                            <div class="card card-success">
-                                <div class="card-header">
-                                    <h3 class="card-title">Laporan Validasi</h3>
-                                </div>
-                                <div class="card-body">
-                                    <p>Laporan hasil validasi oleh Kepala Lapas.</p>
-                                    <form method="get" action="<?= base_url('admin/laporan/preview-validasi') ?>">
-                                        <div class="form-group">
-                                            <label>Periode</label>
-                                            <select name="periode" class="form-control" required>
-                                                <option value="">Pilih Periode</option>
-                                                <?php foreach ($periode_list as $p): ?>
-                                                    <option value="<?= $p ?>"><?= $p ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <button type="submit" class="btn btn-success btn-block">
-                                            <i class="fas fa-eye"></i> Preview Laporan
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Laporan Penilaian Petugas -->
-                        <div class="col-md-4">
-                            <div class="card card-warning">
-                                <div class="card-header">
-                                    <h3 class="card-title">Laporan Penilaian Petugas</h3>
-                                </div>
-                                <div class="card-body">
-                                    <p>Laporan penilaian per petugas BIMKEMASWAT.</p>
-                                    <form method="get" action="<?= base_url('admin/laporan/preview-penilaian-petugas') ?>">
-                                        <div class="form-group">
-                                            <label>Periode</label>
-                                            <select name="periode" class="form-control" required>
-                                                <option value="">Pilih Periode</option>
-                                                <?php foreach ($periode_list as $p): ?>
-                                                    <option value="<?= $p ?>"><?= $p ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Petugas (Opsional)</label>
-                                            <select name="petugas_id" class="form-control">
-                                                <option value="">Semua Petugas</option>
-                                                <?php foreach ($petugas_list as $petugas): ?>
-                                                    <option value="<?= $petugas['id'] ?>"><?= $petugas['nama_lengkap'] ?> (<?= $petugas['username'] ?>)</option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                        <button type="submit" class="btn btn-warning btn-block">
-                                            <i class="fas fa-eye"></i> Preview Laporan
-                                        </button>
-                                    </form>
-                                </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <h5><i class="icon fas fa-info-circle"></i> Informasi</h5>
+                                <p>Laporan validasi dan penilaian petugas telah dihapus sesuai permintaan. Hanya laporan ranking yang tersedia untuk saat ini.</p>
                             </div>
                         </div>
                     </div>

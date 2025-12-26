@@ -48,14 +48,7 @@ $activeMenu = $activeMenu ?? 'dashboard';
                     </a>
                 </li>
                 
-                <!-- Logout -->
-                <li class="nav-item mt-4 border-top pt-3">
-                    <a href="<?= base_url('logout') ?>" class="nav-link text-white bg-danger rounded py-2 d-flex align-items-center justify-content-center" 
-                       style="background-color: #dc3545 !important; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                        <i class="fas fa-sign-out-alt mr-2" style="font-size: 1.1rem;"></i>
-                        <span style="font-weight: 600; font-size: 1rem;">LOGOUT</span>
-                    </a>
-                </li>
+                
             </ul>
         </nav>
     </div>

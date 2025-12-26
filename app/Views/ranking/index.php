@@ -130,13 +130,7 @@ $activeMenu = 'ranking';
                                             </div>
                                         </div>
                                         
-                                        <div class="row mt-2">
-                                            <div class="col-md-12 text-right">
-                                                <a href="<?= base_url('wali/ranking/detail/' . $item['narapidana']['id']) ?>" class="btn btn-info btn-sm">
-                                                    <i class="fas fa-eye"></i> Lihat Detail Lengkap
-                                                </a>
-                                            </div>
-                                        </div>
+                                        <!-- Button lihat detail dihapus sesuai permintaan -->
                                     </div>
                                 </div>
                             </div>

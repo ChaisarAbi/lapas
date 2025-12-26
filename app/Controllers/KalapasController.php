@@ -187,6 +187,89 @@ class KalapasController extends BaseController
         return view('kalapas/riwayat_validasi', $data);
     }
     
+    /**
+     * Preview cetak laporan ranking untuk kalapas
+     */
+    public function previewCetak()
+    {
+        $periode = $this->request->getGet('periode') ?: date('Y-m');
+        
+        // Ambil data untuk perhitungan TOPSIS
+        $kriteria = $this->penilaianModel->getKriteria();
+        $penilaian = $this->penilaianModel->getPenilaianByPeriode($periode);
+        
+        if (empty($penilaian)) {
+            return redirect()->to('kalapas/validasi')->with('error', 'Tidak ada data penilaian untuk periode ' . $periode);
+        }
+        
+        // Ambil hanya narapidana yang memiliki penilaian di periode ini
+        $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
+        $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
+        
+        // Hitung TOPSIS menggunakan RankingController
+        $rankingController = new \App\Controllers\RankingController();
+        $hasil = $rankingController->hitungTOPSIS($narapidana, $kriteria, $penilaian);
+        
+        // Urutkan ranking
+        usort($hasil, function($a, $b) {
+            return $b['preferensi'] <=> $a['preferensi'];
+        });
+        
+        $data = [
+            'title' => 'Preview Cetak Laporan Ranking',
+            'page_title' => 'Preview Cetak Laporan Ranking',
+            'dashboard_url' => 'kalapas/dashboard',
+            'activeMenu' => 'validasi',
+            'narapidana' => $narapidana,
+            'kriteria' => $kriteria,
+            'periode' => $periode,
+            'periode_list' => $this->penilaianModel->getPeriodeForDropdown(),
+            'ranking' => $hasil
+        ];
+        
+        return view('kalapas/preview_cetak', $data);
+    }
+    
+    /**
+     * Cetak laporan ranking untuk kalapas
+     */
+    public function cetakLaporan()
+    {
+        $periode = $this->request->getGet('periode') ?: date('Y-m');
+        
+        // Ambil data untuk perhitungan TOPSIS
+        $kriteria = $this->penilaianModel->getKriteria();
+        $penilaian = $this->penilaianModel->getPenilaianByPeriode($periode);
+        
+        if (empty($penilaian)) {
+            return redirect()->to('kalapas/validasi')->with('error', 'Tidak ada data penilaian untuk periode ' . $periode);
+        }
+        
+        // Ambil hanya narapidana yang memiliki penilaian di periode ini
+        $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
+        $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
+        
+        // Hitung TOPSIS menggunakan RankingController
+        $rankingController = new \App\Controllers\RankingController();
+        $hasil = $rankingController->hitungTOPSIS($narapidana, $kriteria, $penilaian);
+        
+        // Urutkan ranking
+        usort($hasil, function($a, $b) {
+            return $b['preferensi'] <=> $a['preferensi'];
+        });
+        
+        $data = [
+            'title' => 'Laporan Ranking Narapidana',
+            'narapidana' => $narapidana,
+            'kriteria' => $kriteria,
+            'periode' => $periode,
+            'ranking' => $hasil,
+            'tanggal_cetak' => date('d/m/Y H:i:s')
+        ];
+        
+        return view('kalapas/cetak_laporan', $data);
+    }
+    
     private function hitungRankingSederhana($narapidana, $kriteria, $penilaian)
     {
         $hasil = [];

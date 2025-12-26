@@ -81,7 +81,7 @@ class LaporanModel extends Model
         $validasi = $db->table('validasi')
             ->select('validasi.*, narapidana.nama_lengkap, narapidana.nomor_registrasi, users.nama_lengkap as validator_nama')
             ->join('narapidana', 'narapidana.id = validasi.narapidana_id')
-            ->leftJoin('users', 'users.id = validasi.validated_by')
+            ->join('users', 'users.id = validasi.validated_by', 'left')
             ->where('validasi.periode', $periode)
             ->orderBy('validasi.created_at', 'DESC')
             ->get()

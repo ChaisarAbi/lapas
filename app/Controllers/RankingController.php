@@ -23,7 +23,6 @@ class RankingController extends BaseController
         $role = session()->get('role');
         
         // Ambil data untuk perhitungan TOPSIS
-        $narapidana = $this->narapidanaModel->getAktif();
         $kriteria = $this->penilaianModel->getKriteria();
         $penilaian = $this->penilaianModel->getPenilaianByPeriode($periode);
         
@@ -39,6 +38,10 @@ class RankingController extends BaseController
             
             return view('ranking/index', $data);
         }
+        
+        // Ambil hanya narapidana yang memiliki penilaian di periode ini
+        $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
+        $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
         
         // Hitung TOPSIS
         $hasil = $this->hitungTOPSIS($narapidana, $kriteria, $penilaian);
@@ -92,15 +95,25 @@ class RankingController extends BaseController
     public function cetakLaporan()
     {
         $periode = $this->request->getGet('periode') ?: date('Y-m');
+        $role = session()->get('role');
         
+        // Jika role KEPALA_LAPAS, redirect ke halaman preview
+        if ($role === 'KEPALA_LAPAS') {
+            return redirect()->to('kalapas/preview-cetak?periode=' . $periode);
+        }
+        
+        // Untuk role lain (WALI_PEMASYARAKATAN), langsung cetak
         // Ambil data untuk perhitungan TOPSIS
-        $narapidana = $this->narapidanaModel->getAktif();
         $kriteria = $this->penilaianModel->getKriteria();
         $penilaian = $this->penilaianModel->getPenilaianByPeriode($periode);
         
         if (empty($penilaian)) {
             return redirect()->back()->with('error', 'Tidak ada data untuk dicetak');
         }
+        
+        // Ambil hanya narapidana yang memiliki penilaian di periode ini
+        $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
+        $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
         
         // Hitung TOPSIS
         $hasil = $this->hitungTOPSIS($narapidana, $kriteria, $penilaian);
@@ -118,9 +131,14 @@ class RankingController extends BaseController
         return view('ranking/cetak', $data);
     }
     
-    private function hitungTOPSIS($narapidana, $kriteria, $penilaian)
+    public function hitungTOPSIS($narapidana, $kriteria, $penilaian)
     {
         $hasil = [];
+        
+        // Cek jika tidak ada data
+        if (empty($narapidana) || empty($kriteria) || empty($penilaian)) {
+            return $hasil;
+        }
         
         // 1. Buat matriks keputusan
         $matriks = [];
@@ -134,9 +152,36 @@ class RankingController extends BaseController
                         break;
                     }
                 }
+                // Normalisasi nilai 0-100 ke 0-1 (konsisten dengan hitungRankingSederhana)
+                $nilai = $nilai / 100;
                 $row[] = $nilai;
             }
             $matriks[] = $row;
+        }
+        
+        // Debug: cek jika semua nilai sama (kasus khusus)
+        $allSame = true;
+        $firstValue = $matriks[0][0] ?? 0;
+        foreach ($matriks as $row) {
+            foreach ($row as $value) {
+                if ($value != $firstValue) {
+                    $allSame = false;
+                    break 2;
+                }
+            }
+        }
+        
+        // Jika semua nilai sama, berikan nilai preferensi 0.5 (netral)
+        if ($allSame && count($matriks) > 0) {
+            foreach ($narapidana as $index => $napi) {
+                $hasil[$index] = [
+                    'narapidana' => $napi,
+                    'd_positif' => 0,
+                    'd_negatif' => 0,
+                    'preferensi' => 0.5 // Nilai netral untuk kasus semua sama
+                ];
+            }
+            return $hasil;
         }
         
         // 2. Normalisasi matriks
@@ -150,16 +195,33 @@ class RankingController extends BaseController
             }
             $sqrtSum = sqrt($sumSquares);
             
+            // Jika sqrtSum 0 (semua nilai di kolom 0), set ke 1 untuk hindari division by zero
+            if ($sqrtSum == 0) {
+                $sqrtSum = 1;
+            }
+            
             for ($i = 0; $i < count($matriks); $i++) {
-                $normalisasi[$i][$j] = $sqrtSum > 0 ? $matriks[$i][$j] / $sqrtSum : 0;
+                $normalisasi[$i][$j] = $matriks[$i][$j] / $sqrtSum;
             }
         }
         
-        // 3. Matriks terbobot
+        // 3. Matriks terbobot - gunakan bobot dari kriteria
         $terbobot = [];
+        $totalBobot = 0;
+        foreach ($kriteria as $k) {
+            $totalBobot += (float)$k['bobot'];
+        }
+        
+        // Jika total bobot 0, gunakan bobot default (1/n)
+        $useDefaultBobot = ($totalBobot == 0);
+        
         for ($i = 0; $i < count($normalisasi); $i++) {
             for ($j = 0; $j < $jumlahKolom; $j++) {
-                $terbobot[$i][$j] = $normalisasi[$i][$j] * (float)$kriteria[$j]['bobot'];
+                $bobot = (float)$kriteria[$j]['bobot'];
+                if ($useDefaultBobot) {
+                    $bobot = 1 / $jumlahKolom;
+                }
+                $terbobot[$i][$j] = $normalisasi[$i][$j] * $bobot;
             }
         }
         
@@ -170,12 +232,22 @@ class RankingController extends BaseController
         for ($j = 0; $j < $jumlahKolom; $j++) {
             $kolom = array_column($terbobot, $j);
             
-            if ($kriteria[$j]['jenis'] == 'Benefit') {
-                $idealPositif[$j] = max($kolom);
-                $idealNegatif[$j] = min($kolom);
-            } else { // Cost
-                $idealPositif[$j] = min($kolom);
-                $idealNegatif[$j] = max($kolom);
+            // Cek jika semua nilai di kolom sama
+            $kolomMin = min($kolom);
+            $kolomMax = max($kolom);
+            
+            if ($kolomMin == $kolomMax) {
+                // Jika semua nilai sama, set ideal positif dan negatif sama
+                $idealPositif[$j] = $kolomMax;
+                $idealNegatif[$j] = $kolomMin;
+            } else {
+                if ($kriteria[$j]['jenis'] == 'Benefit') {
+                    $idealPositif[$j] = $kolomMax;
+                    $idealNegatif[$j] = $kolomMin;
+                } else { // Cost
+                    $idealPositif[$j] = $kolomMin;
+                    $idealNegatif[$j] = $kolomMax;
+                }
             }
         }
         
@@ -185,8 +257,10 @@ class RankingController extends BaseController
             $dNegatif = 0;
             
             for ($j = 0; $j < $jumlahKolom; $j++) {
-                $dPositif += pow($terbobot[$i][$j] - $idealPositif[$j], 2);
-                $dNegatif += pow($terbobot[$i][$j] - $idealNegatif[$j], 2);
+                $diffPositif = $terbobot[$i][$j] - $idealPositif[$j];
+                $diffNegatif = $terbobot[$i][$j] - $idealNegatif[$j];
+                $dPositif += pow($diffPositif, 2);
+                $dNegatif += pow($diffNegatif, 2);
             }
             
             $dPositif = sqrt($dPositif);

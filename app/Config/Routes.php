@@ -40,10 +40,7 @@ $routes->group('admin', ['filter' => 'role:ADMIN'], function($routes) {
     $routes->get('laporan', 'LaporanController::index');
     $routes->get('laporan/preview-ranking', 'LaporanController::previewRanking');
     $routes->get('laporan/cetak-ranking', 'LaporanController::cetakRanking');
-    $routes->get('laporan/preview-validasi', 'LaporanController::previewValidasi');
-    $routes->get('laporan/cetak-validasi', 'LaporanController::cetakValidasi');
-    $routes->get('laporan/preview-penilaian-petugas', 'LaporanController::previewPenilaianPetugas');
-    $routes->get('laporan/cetak-penilaian-petugas', 'LaporanController::cetakPenilaianPetugas');
+    // Route untuk laporan validasi dan penilaian petugas dihapus sesuai permintaan user
 });
 
 // TPP Routes
@@ -78,7 +75,7 @@ $routes->group('tpp', ['filter' => 'role:TPP'], function($routes) {
     // Hasil ANP
     $routes->get('anp', 'TppAnpController::index');
     $routes->post('anp/simpan-bobot', 'TppAnpController::simpanBobotAkhir');
-    $routes->get('anp/cetak', 'TppAnpController::cetakLaporan');
+    // Route cetak ANP dihapus karena file view tidak ada
     
     // Periode Penilaian
     $routes->get('periode', 'TppPeriodeController::index');
@@ -131,4 +128,8 @@ $routes->group('wali', ['filter' => 'role:WALI_PEMASYARAKATAN'], function($route
         $routes->get('ranking', 'RankingController::index');
         $routes->get('ranking/detail/(:num)', 'RankingController::detail/$1');
         $routes->get('ranking/cetak', 'RankingController::cetakLaporan');
+        
+        // Cetak Laporan dengan Preview
+        $routes->get('preview-cetak', 'KalapasController::previewCetak');
+        $routes->get('cetak-laporan', 'KalapasController::cetakLaporan');
     });

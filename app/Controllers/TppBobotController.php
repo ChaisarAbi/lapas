@@ -33,6 +33,15 @@ class TppBobotController extends BaseController
 
     public function simpan()
     {
+        // Ambil data bobot dari form
+        $bobotData = $this->request->getPost('bobot');
+        $kriteriaIds = $this->request->getPost('kriteria_id');
+        
+        // Validasi: pastikan ada data
+        if (empty($kriteriaIds) || empty($bobotData)) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada data bobot yang dikirim');
+        }
+        
         // Validasi input
         $validation = \Config\Services::validation();
         $validation->setRules([
@@ -43,17 +52,23 @@ class TppBobotController extends BaseController
             return redirect()->back()->withInput()->with('errors', $validation->getErrors());
         }
         
-        // Ambil data bobot dari form
-        $bobotData = $this->request->getPost('bobot');
-        $kriteriaIds = $this->request->getPost('kriteria_id');
-        
+        $updatedCount = 0;
         // Update bobot untuk setiap kriteria
         foreach ($kriteriaIds as $index => $id) {
-            $data = [
-                'id' => $id,
-                'bobot' => floatval($bobotData[$index])
-            ];
-            $this->kriteriaModel->save($data);
+            // Pastikan id dan bobot valid
+            if (!empty($id) && isset($bobotData[$index]) && $bobotData[$index] !== '') {
+                $data = [
+                    'id' => $id,
+                    'bobot' => floatval($bobotData[$index])
+                ];
+                if ($this->kriteriaModel->save($data)) {
+                    $updatedCount++;
+                }
+            }
+        }
+        
+        if ($updatedCount === 0) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada data yang berhasil diperbarui. Pastikan input valid.');
         }
         
         // Hitung total bobot baru

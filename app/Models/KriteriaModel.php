@@ -13,9 +13,11 @@ class KriteriaModel extends Model
     protected $useSoftDeletes = false;
     protected $protectFields = true;
     protected $allowedFields = [
+        'id',
         'kode',
         'nama',
-        'jenis'
+        'jenis',
+        'bobot'
     ];
 
     // Dates
@@ -29,7 +31,8 @@ class KriteriaModel extends Model
     protected $validationRules = [
         'kode' => 'required|min_length[2]|max_length[10]',
         'nama' => 'required|min_length[3]|max_length[100]',
-        'jenis' => 'required|in_list[Benefit,Cost]'
+        'jenis' => 'required|in_list[Benefit,Cost]',
+        'bobot' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[1]'
     ];
     
     protected $validationMessages = [

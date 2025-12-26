@@ -89,6 +89,7 @@
         <h1>LEMBAGA PEMASYARAKATAN</h1>
         <h2>SISTEM PENDUKUNG KEPUTUSAN PEMBINAAN NARAPIDANA</h2>
         <h3>LAPORAN RANKING NARAPIDANA</h3>
+        <h4>DIVALIDASI OLEH KEPALA LAPAS</h4>
     </div>
     
     <div class="info">
@@ -124,7 +125,7 @@
                 <td class="text-center"><?= $index + 1 ?></td>
                 <td><?= $item['narapidana']['nama_lengkap'] ?? 'Tidak tersedia' ?></td>
                 <td><?= $item['narapidana']['no_register'] ?? $item['narapidana']['nomor_registrasi'] ?? '-' ?></td>
-                <td><?= $item['narapidana']['kasus'] ?? $item['narapidana']['jenis_kasus'] ?? '-' ?></td>
+                <td><?= $item['narapidana']['kasus'] ?? $item['narapidana']['jenis_kasus'] ?? $item['narapidana']['jenis_kejahatan'] ?? '-' ?></td>
                 <td class="text-center"><?= number_format($item['d_positif'], 4) ?></td>
                 <td class="text-center"><?= number_format($item['d_negatif'], 4) ?></td>
                 <td class="text-center">
@@ -143,6 +144,7 @@
     
     <div class="footer">
         <p>Dicetak oleh: Sistem SPK Pembinaan Narapidana</p>
+        <p>Divvalidasi oleh: Kepala Lembaga Pemasyarakatan</p>
         <p>Tanggal: <?= date('d/m/Y H:i:s') ?></p>
     </div>
 </body>

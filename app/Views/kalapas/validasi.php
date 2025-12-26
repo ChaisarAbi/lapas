@@ -71,7 +71,7 @@ $activeMenu = 'validasi';
                                             </td>
                                             <td><?= $item['narapidana']['nama_lengkap'] ?></td>
                                             <td><?= $item['narapidana']['nomor_registrasi'] ?></td>
-                                            <td><?= $item['narapidana']['jenis_kejahatan'] ?? '-' ?></td>
+                                            <td><?= $item['narapidana']['kasus'] ?? $item['narapidana']['jenis_kasus'] ?? $item['narapidana']['jenis_kejahatan'] ?? '-' ?></td>
                                             <td>
                                                 <span class="badge badge-<?= $item['preferensi'] >= 0.7 ? 'success' : ($item['preferensi'] >= 0.5 ? 'warning' : 'danger') ?>">
                                                     <?= number_format($item['preferensi'], 4) ?>
@@ -210,7 +210,7 @@ $activeMenu = 'validasi';
                                     <button type="submit" class="btn btn-success btn-lg">
                                         <i class="fas fa-check-circle"></i> Simpan Validasi
                                     </button>
-                                    <a href="<?= base_url('kalapas/ranking/cetak?periode=' . $periode) ?>" target="_blank" class="btn btn-primary btn-lg">
+                                    <a href="<?= base_url('kalapas/preview-cetak?periode=' . $periode) ?>" class="btn btn-primary btn-lg">
                                         <i class="fas fa-print"></i> Cetak Laporan
                                     </a>
                                 </div>

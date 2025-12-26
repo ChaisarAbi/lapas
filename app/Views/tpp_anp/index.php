@@ -46,11 +46,7 @@
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Hasil Analytic Network Process (ANP)</h3>
-                    <div class="card-tools">
-                        <a href="<?= base_url('tpp/anp/cetak') ?>" target="_blank" class="btn btn-success btn-sm">
-                            <i class="fas fa-print"></i> Cetak Laporan
-                        </a>
-                    </div>
+                   
                 </div>
                 <div class="card-body">
                     <?php if (session()->getFlashdata('success')): ?>
@@ -144,9 +140,7 @@
                                         <i class="fas fa-arrow-left"></i> Kembali ke Validasi Konsistensi
                                     </a>
                                     
-                                    <a href="<?= base_url('tpp/anp/cetak') ?>" target="_blank" class="btn btn-success btn-block">
-                                        <i class="fas fa-print"></i> Cetak Laporan ANP
-                                    </a>
+                                   
                                 </div>
                             </div>
                         </div>
