@@ -34,9 +34,9 @@ $activeMenu = 'dashboard';
                     <div class="row mt-4">
                         <div class="col-md-3">
                             <div class="info-box">
-                                <span class="info-box-icon bg-info"><i class="fas fa-list"></i></span>
+                                <span class="info-box-icon bg-info"><i class="fas fa-balance-scale"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Total Kriteria</span>
+                                    <span class="info-box-text">Kriteria (Cluster)</span>
                                     <span class="info-box-number"><?= $totalKriteria ?? 0 ?></span>
                                     <a href="<?= base_url('tpp/kriteria') ?>" class="small-box-footer">Kelola <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
@@ -44,9 +44,9 @@ $activeMenu = 'dashboard';
                         </div>
                         <div class="col-md-3">
                             <div class="info-box">
-                                <span class="info-box-icon bg-success"><i class="fas fa-layer-group"></i></span>
+                                <span class="info-box-icon bg-success"><i class="fas fa-list-alt"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Subkriteria</span>
+                                    <span class="info-box-text">Subkriteria (Node)</span>
                                     <span class="info-box-number"><?= $totalSubkriteria ?? 0 ?></span>
                                     <a href="<?= base_url('tpp/subkriteria') ?>" class="small-box-footer">Kelola <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
@@ -54,27 +54,27 @@ $activeMenu = 'dashboard';
                         </div>
                         <div class="col-md-3">
                             <div class="info-box">
-                                <span class="info-box-icon bg-warning"><i class="fas fa-weight-hanging"></i></span>
+                                <span class="info-box-icon bg-warning"><i class="fas fa-project-diagram"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Bobot Terisi</span>
-                                    <span class="info-box-number"><?= $kriteriaDenganBobot ?? 0 ?></span>
+                                    <span class="info-box-text">Interdependensi</span>
+                                    <span class="info-box-number">Matriks ANP</span>
                                     <div class="progress">
-                                        <div class="progress-bar" style="width: <?= $persentaseBobot ?? 0 ?>%"></div>
+                                        <div class="progress-bar" style="width: <?= $persentaseInterdependensi ?? 0 ?>%"></div>
                                     </div>
                                     <span class="progress-description">
-                                        <?= $persentaseBobot ?? 0 ?>% dari total
+                                        <?= $persentaseInterdependensi ?? 0 ?>% terisi
                                     </span>
-                                    <a href="<?= base_url('tpp/bobot') ?>" class="small-box-footer">Input Bobot <i class="fas fa-arrow-circle-right"></i></a>
+                                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="small-box-footer">Input <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="info-box">
-                                <span class="info-box-icon bg-primary"><i class="fas fa-project-diagram"></i></span>
+                                <span class="info-box-icon bg-primary"><i class="fas fa-chart-bar"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">ANP</span>
-                                    <span class="info-box-number">Analytic Network Process</span>
-                                    <a href="<?= base_url('tpp/anp') ?>" class="small-box-footer">Proses ANP <i class="fas fa-arrow-circle-right"></i></a>
+                                    <span class="info-box-text">Hasil ANP</span>
+                                    <span class="info-box-number">Bobot Final</span>
+                                    <a href="<?= base_url('tpp/anp') ?>" class="small-box-footer">Lihat <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
                             </div>
                         </div>
@@ -102,10 +102,10 @@ $activeMenu = 'dashboard';
                                         <div class="col-md-3">
                                             <div class="card bg-success">
                                                 <div class="card-body text-center">
-                                                    <i class="fas fa-calculator fa-3x mb-3"></i>
-                                                    <h5>Input Bobot</h5>
-                                                    <p>Input bobot awal kriteria</p>
-                                                    <a href="<?= base_url('tpp/bobot') ?>" class="btn btn-light btn-block">Akses</a>
+                                                    <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                                    <h5>Validasi Konsistensi</h5>
+                                                    <p>Validasi matriks perbandingan</p>
+                                                    <a href="<?= base_url('tpp/bobot/matriks') ?>" class="btn btn-light btn-block">Akses</a>
                                                 </div>
                                             </div>
                                         </div>

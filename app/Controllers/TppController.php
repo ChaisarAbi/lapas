@@ -35,9 +35,13 @@ class TppController extends BaseController
             $periode = $periodeDefault;
         }
         
-        // Hitung bobot yang sudah diinput
+        // Hitung kriteria dengan bobot (untuk progress bar)
         $kriteriaDenganBobot = $this->kriteriaModel->where('bobot >', 0)->countAllResults();
         $persentaseBobot = $totalKriteria > 0 ? round(($kriteriaDenganBobot / $totalKriteria) * 100, 1) : 0;
+        
+        // Untuk dashboard ANP, kita gunakan persentase bobot sebagai placeholder
+        // (Dalam implementasi lengkap, hitung persentase interdependensi dari tabel anp_interdependensi)
+        $persentaseInterdependensi = $persentaseBobot; // Placeholder
         
         // Ambil data untuk progress bar
         $kriteriaList = $this->kriteriaModel->findAll();
@@ -60,6 +64,7 @@ class TppController extends BaseController
             'totalSubkriteria' => $totalSubkriteria,
             'kriteriaDenganBobot' => $kriteriaDenganBobot,
             'persentaseBobot' => $persentaseBobot,
+            'persentaseInterdependensi' => $persentaseInterdependensi,
             'periodeAktif' => $periode,
             'progressData' => $progressData
         ];

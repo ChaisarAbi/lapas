@@ -44,14 +44,14 @@ $activeMenu = $activeMenu ?? 'dashboard';
                 <li class="nav-item">
                     <a href="<?= base_url('tpp/kriteria') ?>" class="nav-link <?= $activeMenu == 'kriteria' ? 'active' : '' ?>">
                         <i class="nav-icon fas fa-balance-scale"></i>
-                        <p>Kelola Kriteria</p>
+                        <p>Kelola Kriteria (Cluster)</p>
                     </a>
                 </li>
                 
                 <li class="nav-item">
                     <a href="<?= base_url('tpp/subkriteria') ?>" class="nav-link <?= $activeMenu == 'subkriteria' ? 'active' : '' ?>">
                         <i class="nav-icon fas fa-list-alt"></i>
-                        <p>Kelola Subkriteria</p>
+                        <p>Kelola Subkriteria (Node)</p>
                     </a>
                 </li>
                 
@@ -63,9 +63,9 @@ $activeMenu = $activeMenu ?? 'dashboard';
                 </li>
                 
                 <li class="nav-item">
-                    <a href="<?= base_url('tpp/bobot') ?>" class="nav-link <?= $activeMenu == 'bobot' ? 'active' : '' ?>">
-                        <i class="nav-icon fas fa-calculator"></i>
-                        <p>Input Bobot</p>
+                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="nav-link <?= $activeMenu == 'input-interdependensi' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-project-diagram"></i>
+                        <p>Input Interdependensi</p>
                     </a>
                 </li>
                 
