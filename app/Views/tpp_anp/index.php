@@ -132,8 +132,8 @@
                                     <form action="<?= base_url('tpp/anp/simpan-bobot-akhir') ?>" method="post">
                                         <?= csrf_field() ?>
                                         
-                                        <?php foreach ($kriteria as $index => $k): ?>
-                                            <input type="hidden" name="kriteria_id[]" value="<?= $k['id'] ?>">
+                                        <?php foreach ($subkriteria as $index => $sk): ?>
+                                            <input type="hidden" name="subkriteria_id[]" value="<?= $sk['id'] ?>">
                                             <input type="hidden" name="bobot_akhir[]" value="<?= $hasilAnp['bobot_akhir'][$index] ?>">
                                         <?php endforeach; ?>
                                         
@@ -184,23 +184,23 @@
                                             </thead>
                                             <tbody>
                                                 <?php 
-                                                // Gabungkan data kriteria dengan bobot akhir untuk sorting
-                                                $kriteriaBobot = [];
-                                                foreach ($kriteria as $index => $k) {
-                                                    $kriteriaBobot[] = [
-                                                        'kriteria' => $k,
+                                                // Gabungkan data subkriteria dengan bobot akhir untuk sorting
+                                                $subkriteriaBobot = [];
+                                                foreach ($subkriteria as $index => $sk) {
+                                                    $subkriteriaBobot[] = [
+                                                        'subkriteria' => $sk,
                                                         'bobot_akhir' => $hasilAnp['bobot_akhir'][$index],
                                                         'bobot' => isset($hasilAnp['bobot'][$index]['weight']) ? $hasilAnp['bobot'][$index]['weight'] : 0
                                                     ];
                                                 }
                                                 
                                                 // Urutkan berdasarkan bobot akhir (descending)
-                                                usort($kriteriaBobot, function($a, $b) {
+                                                usort($subkriteriaBobot, function($a, $b) {
                                                     return $b['bobot_akhir'] <=> $a['bobot_akhir'];
                                                 });
                                                 ?>
                                                 
-                                                <?php foreach ($kriteriaBobot as $rank => $item): ?>
+                                                <?php foreach ($subkriteriaBobot as $rank => $item): ?>
                                                 <tr>
                                                     <td class="text-center">
                                                         <span class="badge badge-<?= 
@@ -212,12 +212,15 @@
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <span class="badge badge-info"><?= $item['kriteria']['kode'] ?></span>
+                                                        <span class="badge badge-info"><?= $item['subkriteria']['kode'] ?></span>
                                                     </td>
-                                                    <td><?= $item['kriteria']['nama'] ?></td>
                                                     <td>
-                                                        <span class="badge badge-<?= $item['kriteria']['jenis'] == 'Benefit' ? 'success' : 'danger' ?>">
-                                                            <?= $item['kriteria']['jenis'] ?>
+                                                        <?= $item['subkriteria']['nama'] ?><br>
+                                                        <small class="text-muted">(<?= $item['subkriteria']['kriteria_nama'] ?>)</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge badge-<?= $item['subkriteria']['jenis'] == 'Benefit' ? 'success' : 'danger' ?>">
+                                                            <?= $item['subkriteria']['jenis'] ?>
                                                         </span>
                                                     </td>
                                                     <td class="text-right"><?= number_format($item['bobot'], 4) ?></td>
@@ -243,7 +246,7 @@
                                                 <tr class="bg-light">
                                                     <td colspan="4" class="text-right"><strong>Total:</strong></td>
                                                     <td class="text-right">
-                                                        <strong><?= number_format(array_sum(array_column($kriteriaBobot, 'bobot')), 4) ?></strong>
+                                                        <strong><?= number_format(array_sum(array_column($subkriteriaBobot, 'bobot')), 4) ?></strong>
                                                     </td>
                                                     <td class="text-right">
                                                         <strong><?= number_format(array_sum($hasilAnp['bobot_akhir']), 4) ?></strong>
@@ -271,8 +274,8 @@
                                     $totalBenefit = 0;
                                     $totalCost = 0;
                                     
-                                    foreach ($kriteriaBobot as $item) {
-                                        if ($item['kriteria']['jenis'] == 'Benefit') {
+                                    foreach ($subkriteriaBobot as $item) {
+                                        if ($item['subkriteria']['jenis'] == 'Benefit') {
                                             $totalBenefit += $item['bobot_akhir'];
                                         } else {
                                             $totalCost += $item['bobot_akhir'];

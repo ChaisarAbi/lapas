@@ -76,7 +76,7 @@
                     
                     <div class="alert alert-info">
                         <h5><i class="icon fas fa-info-circle"></i> Petunjuk Input Matriks Interdependensi ANP</h5>
-                        <p>ANP memperhitungkan interdependensi antar kriteria. Input nilai pengaruh kriteria terhadap kriteria lain menggunakan skala Saaty (1-9):</p>
+                        <p>ANP memperhitungkan interdependensi antar subkriteria (node). Input nilai pengaruh subkriteria terhadap subkriteria lain menggunakan skala Saaty (1-9):</p>
                         <ul>
                             <li><strong>1</strong>: Sama pentingnya</li>
                             <li><strong>3</strong>: Sedikit lebih penting</li>
@@ -85,22 +85,29 @@
                             <li><strong>9</strong>: Mutlak lebih penting</li>
                             <li><strong>2,4,6,8</strong>: Nilai antara</li>
                         </ul>
-                        <p>Diagonal utama (kriteria terhadap diri sendiri) selalu 1.</p>
+                        <p>Diagonal utama (subkriteria terhadap diri sendiri) selalu 1.</p>
+                        <p><strong>Konsep ANP:</strong> Kriteria = Cluster, Subkriteria = Node. Input perbandingan antar node untuk mendapatkan bobot akhir.</p>
                     </div>
                     
                     <form action="<?= base_url('tpp/anp/simpan-interdependensi') ?>" method="post">
                         <?= csrf_field() ?>
+                        
+                        <div class="alert alert-warning">
+                            <i class="icon fas fa-exclamation-triangle"></i>
+                            <strong>Perhatian:</strong> Matriks ini akan berukuran <?= count($subkriteria) ?> x <?= count($subkriteria) ?> (<?= count($subkriteria) ?> subkriteria). 
+                            Pastikan Anda mengisi dengan benar menggunakan skala Saaty (1-9).
+                        </div>
                         
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped">
                                 <thead>
                                     <tr>
                                         <th width="5%">#</th>
-                                        <th width="20%">Kriteria</th>
-                                        <?php foreach ($kriteria as $k): ?>
-                                        <th width="10%" class="text-center">
-                                            <span class="badge badge-info"><?= $k['kode'] ?></span><br>
-                                            <small><?= substr($k['nama'], 0, 15) ?>...</small>
+                                        <th width="25%">Subkriteria (Node)</th>
+                                        <?php foreach ($subkriteria as $sk): ?>
+                                        <th width="8%" class="text-center">
+                                            <span class="badge badge-info"><?= $sk['kode'] ?></span><br>
+                                            <small><?= substr($sk['nama'], 0, 10) ?>...</small>
                                         </th>
                                         <?php endforeach; ?>
                                     </tr>
@@ -115,17 +122,18 @@
                                     }
                                     ?>
                                     
-                                    <?php foreach ($kriteria as $i => $kriteriaDari): ?>
+                                    <?php foreach ($subkriteria as $i => $subkriteriaDari): ?>
                                     <tr>
                                         <td class="text-center"><?= $i + 1 ?></td>
                                         <td>
-                                            <strong><?= $kriteriaDari['kode'] ?></strong><br>
-                                            <small><?= $kriteriaDari['nama'] ?></small>
+                                            <strong><?= $subkriteriaDari['kode'] ?></strong><br>
+                                            <small><?= $subkriteriaDari['nama'] ?></small><br>
+                                            <span class="badge badge-secondary"><?= $subkriteriaDari['kriteria_nama'] ?></span>
                                         </td>
-                                        <?php foreach ($kriteria as $j => $kriteriaKe): ?>
+                                        <?php foreach ($subkriteria as $j => $subkriteriaKe): ?>
                                         <td class="text-center">
                                             <?php 
-                                            $key = $kriteriaDari['id'] . '_' . $kriteriaKe['id'];
+                                            $key = $subkriteriaDari['id'] . '_' . $subkriteriaKe['id'];
                                             $nilai = isset($interdependensiMap[$key]) ? $interdependensiMap[$key] : ($i == $j ? 1 : 0);
                                             ?>
                                             <input type="number" 
@@ -135,7 +143,7 @@
                                                    max="9" 
                                                    step="0.1"
                                                    class="form-control form-control-sm text-center"
-                                                   style="width: 80px; margin: 0 auto;"
+                                                   style="width: 70px; margin: 0 auto;"
                                                    <?= $i == $j ? 'readonly' : '' ?>>
                                             <?php if ($i == $j): ?>
                                                 <small class="text-muted">(self)</small>

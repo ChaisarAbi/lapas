@@ -3,18 +3,21 @@
 namespace App\Controllers;
 
 use App\Models\KriteriaModel;
+use App\Models\SubkriteriaModel;
 use App\Models\AnpModel;
 use App\Models\PeriodeModel;
 
 class TppAnpController extends BaseController
 {
     protected $kriteriaModel;
+    protected $subkriteriaModel;
     protected $anpModel;
     protected $periodeModel;
 
     public function __construct()
     {
         $this->kriteriaModel = new KriteriaModel();
+        $this->subkriteriaModel = new SubkriteriaModel();
         $this->anpModel = new AnpModel();
         $this->periodeModel = new PeriodeModel();
     }
@@ -25,27 +28,27 @@ class TppAnpController extends BaseController
         $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
         $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
         
-        // Ambil semua kriteria
-        $kriteria = $this->kriteriaModel->findAll();
+        // Ambil semua subkriteria (node ANP)
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
         
         // Ambil data interdependensi ANP
         $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
         
         // Jika tidak ada data interdependensi, buat default
         if (empty($interdependensi)) {
-            $interdependensi = $this->buatInterdependensiDefault($kriteria, $periodeId);
+            $interdependensi = $this->buatInterdependensiDefault($subkriteria, $periodeId);
         }
         
         // Bangun supermatrix dari interdependensi
         $clusters = $this->getClusters();
-        $supermatrix = $this->anpModel->buildSupermatrix($kriteria, $interdependensi, $clusters);
+        $supermatrix = $this->anpModel->buildSupermatrix($subkriteria, $interdependensi, $clusters);
         
         // Hitung hasil ANP lengkap
-        $hasilAnp = $this->hitungANPLengkap($supermatrix, $kriteria);
+        $hasilAnp = $this->hitungANPLengkap($supermatrix, $subkriteria);
         
         $data = [
             'title' => 'Hasil Analytic Network Process (ANP) - SPK Pembinaan',
-            'kriteria' => $kriteria,
+            'subkriteria' => $subkriteria,
             'interdependensi' => $interdependensi,
             'hasilAnp' => $hasilAnp,
             'periode' => $periodeAktif,
@@ -62,19 +65,19 @@ class TppAnpController extends BaseController
         return $db->table('anp_clusters')->orderBy('urutan', 'ASC')->get()->getResultArray();
     }
 
-    private function buatInterdependensiDefault($kriteria, $periodeId = null)
+    private function buatInterdependensiDefault($subkriteria, $periodeId = null)
     {
         $interdependensi = [];
-        $n = count($kriteria);
+        $n = count($subkriteria);
         
         // Buat interdependensi default: hanya self-comparison
         for ($i = 0; $i < $n; $i++) {
             for ($j = 0; $j < $n; $j++) {
                 $interdependensi[] = [
-                    'cluster_id_dari' => 1, // Default cluster
-                    'cluster_id_ke' => 1,
-                    'kriteria_id_dari' => $kriteria[$i]['id'],
-                    'kriteria_id_ke' => $kriteria[$j]['id'],
+                    'cluster_id_dari' => $subkriteria[$i]['kriteria_id'], // Cluster = kriteria_id
+                    'cluster_id_ke' => $subkriteria[$j]['kriteria_id'],
+                    'kriteria_id_dari' => $subkriteria[$i]['id'], // Node = subkriteria_id
+                    'kriteria_id_ke' => $subkriteria[$j]['id'],
                     'nilai' => ($i == $j) ? 1.0 : 0.0, // Diagonal = 1, lainnya = 0
                     'tipe' => 'element_to_element',
                     'periode_id' => $periodeId
@@ -85,7 +88,7 @@ class TppAnpController extends BaseController
         return $interdependensi;
     }
 
-    private function hitungANPLengkap($supermatrix, $kriteria)
+    private function hitungANPLengkap($supermatrix, $subkriteria)
     {
         $n = count($supermatrix);
         
@@ -102,7 +105,7 @@ class TppAnpController extends BaseController
         $limitSupermatrix = $this->anpModel->calculateLimitSupermatrix($weightedSupermatrix);
         
         // 5. Ekstrak bobot dari limit supermatrix
-        $bobot = $this->anpModel->extractWeights($limitSupermatrix, $kriteria);
+        $bobot = $this->anpModel->extractWeights($limitSupermatrix, $subkriteria);
         
         // 6. Hitung bobot akhir (normalisasi)
         $totalBobot = array_sum(array_column($bobot, 'weight'));
@@ -133,15 +136,15 @@ class TppAnpController extends BaseController
         $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
         $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
         
-        // Ambil semua kriteria
-        $kriteria = $this->kriteriaModel->findAll();
+        // Ambil semua subkriteria dengan info kriteria
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
         
         // Ambil data interdependensi yang sudah ada
         $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
         
         $data = [
             'title' => 'Input Matriks Interdependensi ANP - SPK Pembinaan',
-            'kriteria' => $kriteria,
+            'subkriteria' => $subkriteria,
             'interdependensi' => $interdependensi,
             'periode' => $periodeAktif,
             'activeMenu' => 'input-interdependensi'
@@ -159,8 +162,8 @@ class TppAnpController extends BaseController
         }
         
         $periodeId = $periodeAktif['id'];
-        $kriteria = $this->kriteriaModel->findAll();
-        $n = count($kriteria);
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        $n = count($subkriteria);
         
         // Ambil data dari POST
         $postData = $this->request->getPost();
@@ -174,10 +177,10 @@ class TppAnpController extends BaseController
                     $nilai = floatval($postData[$key]);
                     if ($nilai > 0) {
                         $interdependensiData[] = [
-                            'cluster_id_dari' => 1, // Default cluster
-                            'cluster_id_ke' => 1,
-                            'kriteria_id_dari' => $kriteria[$i]['id'],
-                            'kriteria_id_ke' => $kriteria[$j]['id'],
+                            'cluster_id_dari' => $subkriteria[$i]['kriteria_id'],
+                            'cluster_id_ke' => $subkriteria[$j]['kriteria_id'],
+                            'kriteria_id_dari' => $subkriteria[$i]['id'],
+                            'kriteria_id_ke' => $subkriteria[$j]['id'],
                             'nilai' => $nilai,
                             'tipe' => 'element_to_element',
                             'periode_id' => $periodeId
@@ -201,10 +204,10 @@ class TppAnpController extends BaseController
     {
         // Ambil bobot akhir dari POST
         $bobotAkhir = $this->request->getPost('bobot_akhir');
-        $kriteriaIds = $this->request->getPost('kriteria_id');
+        $subkriteriaIds = $this->request->getPost('subkriteria_id');
         
         // Validasi: pastikan ada data
-        if (empty($kriteriaIds) || empty($bobotAkhir)) {
+        if (empty($subkriteriaIds) || empty($bobotAkhir)) {
             return redirect()->back()->withInput()->with('error', 'Tidak ada data bobot yang dikirim');
         }
         
@@ -219,17 +222,46 @@ class TppAnpController extends BaseController
         }
         
         $updatedCount = 0;
-        // Update bobot di database
-        foreach ($kriteriaIds as $index => $id) {
+        $bobotPerKriteria = []; // Untuk menghitung rata-rata bobot per kriteria
+        
+        // Update bobot di database (ke tabel subkriteria)
+        foreach ($subkriteriaIds as $index => $id) {
             // Pastikan id dan bobot valid
             if (!empty($id) && isset($bobotAkhir[$index]) && $bobotAkhir[$index] !== '') {
-                $data = [
-                    'id' => $id,
-                    'bobot' => floatval($bobotAkhir[$index])
-                ];
-                if ($this->kriteriaModel->save($data)) {
-                    $updatedCount++;
+                $bobot = floatval($bobotAkhir[$index]);
+                
+                // Ambil data subkriteria untuk mendapatkan kriteria_id
+                $subkriteria = $this->subkriteriaModel->find($id);
+                if ($subkriteria) {
+                    $kriteriaId = $subkriteria['kriteria_id'];
+                    
+                    // Simpan bobot ke subkriteria
+                    $data = [
+                        'id' => $id,
+                        'bobot' => $bobot
+                    ];
+                    if ($this->subkriteriaModel->save($data)) {
+                        $updatedCount++;
+                        
+                        // Kumpulkan bobot per kriteria untuk menghitung rata-rata
+                        if (!isset($bobotPerKriteria[$kriteriaId])) {
+                            $bobotPerKriteria[$kriteriaId] = [
+                                'total' => 0,
+                                'count' => 0
+                            ];
+                        }
+                        $bobotPerKriteria[$kriteriaId]['total'] += $bobot;
+                        $bobotPerKriteria[$kriteriaId]['count']++;
+                    }
                 }
+            }
+        }
+        
+        // Update bobot kriteria berdasarkan rata-rata bobot subkriteria
+        foreach ($bobotPerKriteria as $kriteriaId => $data) {
+            if ($data['count'] > 0) {
+                $rataRata = $data['total'] / $data['count'];
+                $this->kriteriaModel->update($kriteriaId, ['bobot' => $rataRata]);
             }
         }
         
@@ -237,6 +269,6 @@ class TppAnpController extends BaseController
             return redirect()->back()->withInput()->with('error', 'Tidak ada data yang berhasil diperbarui. Pastikan input valid.');
         }
         
-        return redirect()->to('/tpp/anp')->with('success', 'Bobot akhir ANP berhasil disimpan ke database!');
+        return redirect()->to('/tpp/anp')->with('success', 'Bobot akhir ANP berhasil disimpan ke database! (Subkriteria dan Kriteria telah diperbarui)');
     }
 }
