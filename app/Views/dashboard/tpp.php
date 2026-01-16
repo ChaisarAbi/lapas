@@ -89,43 +89,43 @@ $activeMenu = 'dashboard';
                                 </div>
                                 <div class="card-body p-2">
                                     <div class="row">
-                                        <div class="col-md-3">
-                                            <div class="card bg-info">
-                                                <div class="card-body text-center">
+                                        <div class="col-md-3 mb-3">
+                                            <div class="card bg-info h-100">
+                                                <div class="card-body text-center d-flex flex-column">
                                                     <i class="fas fa-balance-scale fa-3x mb-3"></i>
                                                     <h5>Kelola Kriteria</h5>
-                                                    <p>Atur kriteria dan subkriteria penilaian</p>
-                                                    <a href="<?= base_url('tpp/kriteria') ?>" class="btn btn-light btn-block">Akses</a>
+                                                    <p class="flex-grow-1">Atur kriteria dan subkriteria penilaian</p>
+                                                    <a href="<?= base_url('tpp/kriteria') ?>" class="btn btn-light btn-block mt-auto">Akses</a>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-3">
-                                            <div class="card bg-success">
-                                                <div class="card-body text-center">
+                                        <div class="col-md-3 mb-3">
+                                            <div class="card bg-success h-100">
+                                                <div class="card-body text-center d-flex flex-column">
                                                     <i class="fas fa-check-circle fa-3x mb-3"></i>
                                                     <h5>Validasi Konsistensi</h5>
-                                                    <p>Validasi matriks perbandingan</p>
-                                                    <a href="<?= base_url('tpp/bobot/matriks') ?>" class="btn btn-light btn-block">Akses</a>
+                                                    <p class="flex-grow-1">Validasi matriks perbandingan</p>
+                                                    <a href="<?= base_url('tpp/bobot/matriks') ?>" class="btn btn-light btn-block mt-auto">Akses</a>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-3">
-                                            <div class="card bg-warning">
-                                                <div class="card-body text-center">
+                                        <div class="col-md-3 mb-3">
+                                            <div class="card bg-warning h-100">
+                                                <div class="card-body text-center d-flex flex-column">
                                                     <i class="fas fa-project-diagram fa-3x mb-3"></i>
                                                     <h5>Input Interdependensi</h5>
-                                                    <p>Input matriks interdependensi ANP</p>
-                                                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="btn btn-light btn-block">Akses</a>
+                                                    <p class="flex-grow-1">Input matriks interdependensi ANP</p>
+                                                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="btn btn-light btn-block mt-auto">Akses</a>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-3">
-                                            <div class="card bg-primary">
-                                                <div class="card-body text-center">
+                                        <div class="col-md-3 mb-3">
+                                            <div class="card bg-primary h-100">
+                                                <div class="card-body text-center d-flex flex-column">
                                                     <i class="fas fa-chart-bar fa-3x mb-3"></i>
                                                     <h5>Hasil ANP</h5>
-                                                    <p>Lihat hasil perhitungan ANP</p>
-                                                    <a href="<?= base_url('tpp/anp') ?>" class="btn btn-light btn-block">Akses</a>
+                                                    <p class="flex-grow-1">Lihat hasil perhitungan ANP</p>
+                                                    <a href="<?= base_url('tpp/anp') ?>" class="btn btn-light btn-block mt-auto">Akses</a>
                                                 </div>
                                             </div>
                                         </div>
