@@ -26,6 +26,12 @@
             <p>Validasi Konsistensi</p>
         </a>
     </li>
+    <li class="nav-item">
+        <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="nav-link">
+            <i class="nav-icon fas fa-project-diagram"></i>
+            <p>Input Interdependensi</p>
+        </a>
+    </li>
     <li class="nav-header">LAPORAN</li>
     <li class="nav-item">
         <a href="<?= base_url('tpp/anp') ?>" class="nav-link active">
@@ -67,6 +73,14 @@
                         <h5><i class="icon fas fa-info-circle"></i> Tentang Analytic Network Process (ANP)</h5>
                         <p>ANP adalah metode pengambilan keputusan yang memperhitungkan interdependensi antar kriteria. Hasil ANP berupa bobot akhir yang digunakan dalam perhitungan TOPSIS.</p>
                     </div>
+                    
+                    <?php if ($periode): ?>
+                        <div class="alert alert-info">
+                            <i class="icon fas fa-calendar-alt"></i> 
+                            Periode Aktif: <strong><?= $periode['nama_periode'] ?></strong> | 
+                            <?= date('d F Y', strtotime($periode['tanggal_mulai'])) ?> - <?= date('d F Y', strtotime($periode['tanggal_selesai'])) ?>
+                        </div>
+                    <?php endif; ?>
                     
                     <div class="row">
                         <div class="col-md-6">
@@ -115,7 +129,7 @@
                                     <h3 class="card-title">Aksi</h3>
                                 </div>
                                 <div class="card-body">
-                                    <form action="<?= base_url('tpp/anp/simpan-bobot') ?>" method="post">
+                                    <form action="<?= base_url('tpp/anp/simpan-bobot-akhir') ?>" method="post">
                                         <?= csrf_field() ?>
                                         
                                         <?php foreach ($kriteria as $index => $k): ?>
@@ -136,11 +150,13 @@
                                         <?php endif; ?>
                                     </form>
                                     
-                                    <a href="<?= base_url('tpp/bobot/konsistensi') ?>" class="btn btn-info btn-block mb-2">
-                                        <i class="fas fa-arrow-left"></i> Kembali ke Validasi Konsistensi
+                                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="btn btn-info btn-block mb-2">
+                                        <i class="fas fa-edit"></i> Edit Matriks Interdependensi
                                     </a>
                                     
-                                   
+                                    <a href="<?= base_url('tpp/bobot/konsistensi') ?>" class="btn btn-secondary btn-block mb-2">
+                                        <i class="fas fa-arrow-left"></i> Kembali ke Validasi Konsistensi
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -174,7 +190,7 @@
                                                     $kriteriaBobot[] = [
                                                         'kriteria' => $k,
                                                         'bobot_akhir' => $hasilAnp['bobot_akhir'][$index],
-                                                        'bobot_prioritas' => $hasilAnp['bobot_prioritas'][$index]
+                                                        'bobot' => isset($hasilAnp['bobot'][$index]['weight']) ? $hasilAnp['bobot'][$index]['weight'] : 0
                                                     ];
                                                 }
                                                 
@@ -204,7 +220,7 @@
                                                             <?= $item['kriteria']['jenis'] ?>
                                                         </span>
                                                     </td>
-                                                    <td class="text-right"><?= number_format($item['bobot_prioritas'], 4) ?></td>
+                                                    <td class="text-right"><?= number_format($item['bobot'], 4) ?></td>
                                                     <td class="text-right">
                                                         <span class="badge badge-<?= 
                                                             $item['bobot_akhir'] >= 0.2 ? 'primary' : 
@@ -227,7 +243,7 @@
                                                 <tr class="bg-light">
                                                     <td colspan="4" class="text-right"><strong>Total:</strong></td>
                                                     <td class="text-right">
-                                                        <strong><?= number_format(array_sum($hasilAnp['bobot_prioritas']), 4) ?></strong>
+                                                        <strong><?= number_format(array_sum(array_column($kriteriaBobot, 'bobot')), 4) ?></strong>
                                                     </td>
                                                     <td class="text-right">
                                                         <strong><?= number_format(array_sum($hasilAnp['bobot_akhir']), 4) ?></strong>

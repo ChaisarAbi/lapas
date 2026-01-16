@@ -74,7 +74,9 @@ $routes->group('tpp', ['filter' => 'role:TPP'], function($routes) {
     
     // Hasil ANP
     $routes->get('anp', 'TppAnpController::index');
-    $routes->post('anp/simpan-bobot', 'TppAnpController::simpanBobotAkhir');
+    $routes->post('anp/simpan-bobot-akhir', 'TppAnpController::simpanBobotAkhir');
+    $routes->get('anp/input-interdependensi', 'TppAnpController::inputInterdependensi');
+    $routes->post('anp/simpan-interdependensi', 'TppAnpController::simpanInterdependensi');
     // Route cetak ANP dihapus karena file view tidak ada
     
     // Periode Penilaian

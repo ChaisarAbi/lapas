@@ -3,156 +3,198 @@
 namespace App\Controllers;
 
 use App\Models\KriteriaModel;
+use App\Models\AnpModel;
+use App\Models\PeriodeModel;
 
 class TppAnpController extends BaseController
 {
     protected $kriteriaModel;
+    protected $anpModel;
+    protected $periodeModel;
 
     public function __construct()
     {
         $this->kriteriaModel = new KriteriaModel();
+        $this->anpModel = new AnpModel();
+        $this->periodeModel = new PeriodeModel();
     }
 
     public function index()
     {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+        
         // Ambil semua kriteria
         $kriteria = $this->kriteriaModel->findAll();
         
-        // Ambil matriks perbandingan dari session
-        $matriks = session()->get('matriks_perbandingan');
+        // Ambil data interdependensi ANP
+        $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
         
-        // Jika tidak ada matriks, buat matriks default
-        if (!$matriks) {
-            $matriks = $this->buatMatriksDefault($kriteria);
+        // Jika tidak ada data interdependensi, buat default
+        if (empty($interdependensi)) {
+            $interdependensi = $this->buatInterdependensiDefault($kriteria, $periodeId);
         }
         
-        // Hitung hasil ANP
-        $hasilAnp = $this->hitungANP($matriks);
+        // Bangun supermatrix dari interdependensi
+        $clusters = $this->getClusters();
+        $supermatrix = $this->anpModel->buildSupermatrix($kriteria, $interdependensi, $clusters);
+        
+        // Hitung hasil ANP lengkap
+        $hasilAnp = $this->hitungANPLengkap($supermatrix, $kriteria);
         
         $data = [
             'title' => 'Hasil Analytic Network Process (ANP) - SPK Pembinaan',
             'kriteria' => $kriteria,
-            'matriks' => $matriks,
+            'interdependensi' => $interdependensi,
             'hasilAnp' => $hasilAnp,
+            'periode' => $periodeAktif,
             'activeMenu' => 'hasil-anp'
         ];
         
         return view('tpp_anp/index', $data);
     }
 
-    private function buatMatriksDefault($kriteria)
+    private function getClusters()
     {
-        $n = count($kriteria);
-        $matriks = [];
-        
-        // Buat matriks identitas
-        for ($i = 0; $i < $n; $i++) {
-            for ($j = 0; $j < $n; $j++) {
-                if ($i == $j) {
-                    $matriks[$i][$j] = 1;
-                } else {
-                    // Nilai default: 1 untuk semua (netral)
-                    $matriks[$i][$j] = 1;
-                }
-            }
-        }
-        
-        return $matriks;
+        // Ambil clusters dari database
+        $db = \Config\Database::connect();
+        return $db->table('anp_clusters')->orderBy('urutan', 'ASC')->get()->getResultArray();
     }
 
-    private function hitungANP($matriks)
+    private function buatInterdependensiDefault($kriteria, $periodeId = null)
     {
-        // Validasi matriks
-        if (!is_array($matriks) || empty($matriks)) {
-            // Buat matriks default jika tidak valid
-            $kriteria = $this->kriteriaModel->findAll();
-            $matriks = $this->buatMatriksDefault($kriteria);
-        }
+        $interdependensi = [];
+        $n = count($kriteria);
         
-        $n = count($matriks);
-        
-        // Validasi dan normalisasi nilai matriks
+        // Buat interdependensi default: hanya self-comparison
         for ($i = 0; $i < $n; $i++) {
             for ($j = 0; $j < $n; $j++) {
-                if (!isset($matriks[$i][$j]) || $matriks[$i][$j] === '') {
-                    $matriks[$i][$j] = ($i == $j) ? 1 : 1; // Default 1 untuk ANP
-                }
-                $matriks[$i][$j] = floatval($matriks[$i][$j]);
+                $interdependensi[] = [
+                    'cluster_id_dari' => 1, // Default cluster
+                    'cluster_id_ke' => 1,
+                    'kriteria_id_dari' => $kriteria[$i]['id'],
+                    'kriteria_id_ke' => $kriteria[$j]['id'],
+                    'nilai' => ($i == $j) ? 1.0 : 0.0, // Diagonal = 1, lainnya = 0
+                    'tipe' => 'element_to_element',
+                    'periode_id' => $periodeId
+                ];
             }
         }
         
-        // 1. Hitung jumlah per kolom
-        $jumlahKolom = [];
-        for ($j = 0; $j < $n; $j++) {
-            $jumlahKolom[$j] = 0;
-            for ($i = 0; $i < $n; $i++) {
-                $jumlahKolom[$j] += $matriks[$i][$j];
-            }
-            // Hindari pembagian dengan nol
-            if ($jumlahKolom[$j] == 0) {
-                $jumlahKolom[$j] = 1;
-            }
-        }
+        return $interdependensi;
+    }
+
+    private function hitungANPLengkap($supermatrix, $kriteria)
+    {
+        $n = count($supermatrix);
         
-        // 2. Normalisasi matriks
-        $matriksNormalisasi = [];
-        for ($i = 0; $i < $n; $i++) {
-            for ($j = 0; $j < $n; $j++) {
-                $matriksNormalisasi[$i][$j] = $matriks[$i][$j] / $jumlahKolom[$j];
-            }
-        }
+        // 1. Hitung konsistensi
+        $konsistensi = $this->anpModel->calculateConsistency($supermatrix);
         
-        // 3. Hitung rata-rata per baris (bobot eigen/prioritas)
-        $bobotPrioritas = [];
-        for ($i = 0; $i < $n; $i++) {
-            $bobotPrioritas[$i] = array_sum($matriksNormalisasi[$i]) / $n;
-        }
+        // 2. Normalisasi supermatrix (unweighted supermatrix)
+        $unweightedSupermatrix = $this->anpModel->normalizeSupermatrix($supermatrix);
         
-        // 4. Hitung λ maksimum
-        $lambdaMax = 0;
-        for ($i = 0; $i < $n; $i++) {
-            $jumlahBaris = 0;
-            for ($j = 0; $j < $n; $j++) {
-                $jumlahBaris += $matriks[$i][$j] * $bobotPrioritas[$j];
-            }
-            // Hindari pembagian dengan nol
-            if ($bobotPrioritas[$i] != 0) {
-                $lambdaMax += $jumlahBaris / $bobotPrioritas[$i];
-            } else {
-                $lambdaMax += 0;
-            }
-        }
-        $lambdaMax = $lambdaMax / $n;
+        // 3. Buat weighted supermatrix (dalam ANP sederhana, sama dengan unweighted)
+        $weightedSupermatrix = $unweightedSupermatrix;
         
-        // 5. Hitung Consistency Index (CI)
-        $ci = ($n > 1) ? ($lambdaMax - $n) / ($n - 1) : 0;
+        // 4. Hitung limit supermatrix (konvergensi)
+        $limitSupermatrix = $this->anpModel->calculateLimitSupermatrix($weightedSupermatrix);
         
-        // 6. Tabel Random Index (RI)
-        $riTable = [0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49];
-        $ri = isset($riTable[$n]) ? $riTable[$n] : 1.49;
+        // 5. Ekstrak bobot dari limit supermatrix
+        $bobot = $this->anpModel->extractWeights($limitSupermatrix, $kriteria);
         
-        // 7. Hitung Consistency Ratio (CR)
-        $cr = ($ri > 0) ? $ci / $ri : 0;
-        
-        // 8. Hitung bobot akhir (normalisasi bobot prioritas)
-        $totalBobotPrioritas = array_sum($bobotPrioritas);
+        // 6. Hitung bobot akhir (normalisasi)
+        $totalBobot = array_sum(array_column($bobot, 'weight'));
         $bobotAkhir = [];
-        foreach ($bobotPrioritas as $bobot) {
-            $bobotAkhir[] = ($totalBobotPrioritas > 0) ? $bobot / $totalBobotPrioritas : 0;
+        foreach ($bobot as $item) {
+            $bobotAkhir[] = $totalBobot > 0 ? $item['weight'] / $totalBobot : 0;
         }
         
         return [
             'n' => $n,
-            'lambda_max' => $lambdaMax,
-            'ci' => $ci,
-            'ri' => $ri,
-            'cr' => $cr,
-            'konsisten' => $cr < 0.1,
-            'bobot_prioritas' => $bobotPrioritas,
+            'lambda_max' => $konsistensi['lambda_max'],
+            'ci' => $konsistensi['ci'],
+            'ri' => $konsistensi['ri'],
+            'cr' => $konsistensi['cr'],
+            'konsisten' => $konsistensi['konsisten'],
+            'bobot' => $bobot,
             'bobot_akhir' => $bobotAkhir,
-            'matriks_normalisasi' => $matriksNormalisasi,
-            'jumlah_kolom' => $jumlahKolom
+            'supermatrix' => $supermatrix,
+            'unweighted_supermatrix' => $unweightedSupermatrix,
+            'weighted_supermatrix' => $weightedSupermatrix,
+            'limit_supermatrix' => $limitSupermatrix
         ];
+    }
+
+    public function inputInterdependensi()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+        
+        // Ambil semua kriteria
+        $kriteria = $this->kriteriaModel->findAll();
+        
+        // Ambil data interdependensi yang sudah ada
+        $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
+        
+        $data = [
+            'title' => 'Input Matriks Interdependensi ANP - SPK Pembinaan',
+            'kriteria' => $kriteria,
+            'interdependensi' => $interdependensi,
+            'periode' => $periodeAktif,
+            'activeMenu' => 'input-interdependensi'
+        ];
+        
+        return view('tpp_anp/input_interdependensi', $data);
+    }
+
+    public function simpanInterdependensi()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        $periodeId = $periodeAktif['id'];
+        $kriteria = $this->kriteriaModel->findAll();
+        $n = count($kriteria);
+        
+        // Ambil data dari POST
+        $postData = $this->request->getPost();
+        $interdependensiData = [];
+        
+        // Proses data matriks interdependensi
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = 0; $j < $n; $j++) {
+                $key = "interdependensi_{$i}_{$j}";
+                if (isset($postData[$key])) {
+                    $nilai = floatval($postData[$key]);
+                    if ($nilai > 0) {
+                        $interdependensiData[] = [
+                            'cluster_id_dari' => 1, // Default cluster
+                            'cluster_id_ke' => 1,
+                            'kriteria_id_dari' => $kriteria[$i]['id'],
+                            'kriteria_id_ke' => $kriteria[$j]['id'],
+                            'nilai' => $nilai,
+                            'tipe' => 'element_to_element',
+                            'periode_id' => $periodeId
+                        ];
+                    }
+                }
+            }
+        }
+        
+        // Simpan ke database
+        $saved = $this->anpModel->saveMatrix($interdependensiData, $periodeId);
+        
+        if ($saved > 0) {
+            return redirect()->to('/tpp/anp')->with('success', "Matriks interdependensi ANP berhasil disimpan ($saved data)");
+        } else {
+            return redirect()->back()->withInput()->with('error', 'Gagal menyimpan matriks interdependensi.');
+        }
     }
 
     public function simpanBobotAkhir()
@@ -197,7 +239,4 @@ class TppAnpController extends BaseController
         
         return redirect()->to('/tpp/anp')->with('success', 'Bobot akhir ANP berhasil disimpan ke database!');
     }
-
-    // Method cetakLaporan dihapus karena file view tidak ada
-    // dan sesuai permintaan untuk menghilangkan cetak laporan lama
 }
