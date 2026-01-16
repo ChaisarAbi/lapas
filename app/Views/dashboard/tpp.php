@@ -31,54 +31,7 @@ $activeMenu = 'dashboard';
                         <p>Metode Analytic Network Process (ANP) digunakan untuk menentukan bobot kriteria dengan mempertimbangkan interdependensi antar kriteria.</p>
                     </div>
                     
-                    <div class="row mt-4">
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-info"><i class="fas fa-balance-scale"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Kriteria (Cluster)</span>
-                                    <span class="info-box-number"><?= $totalKriteria ?? 0 ?></span>
-                                    <a href="<?= base_url('tpp/kriteria') ?>" class="small-box-footer">Kelola <i class="fas fa-arrow-circle-right"></i></a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-success"><i class="fas fa-list-alt"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Subkriteria (Node)</span>
-                                    <span class="info-box-number"><?= $totalSubkriteria ?? 0 ?></span>
-                                    <a href="<?= base_url('tpp/subkriteria') ?>" class="small-box-footer">Kelola <i class="fas fa-arrow-circle-right"></i></a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-warning"><i class="fas fa-project-diagram"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Interdependensi</span>
-                                    <span class="info-box-number">Matriks ANP</span>
-                                    <div class="progress">
-                                        <div class="progress-bar" style="width: <?= $persentaseInterdependensi ?? 0 ?>%"></div>
-                                    </div>
-                                    <span class="progress-description">
-                                        <?= $persentaseInterdependensi ?? 0 ?>% terisi
-                                    </span>
-                                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="small-box-footer">Input <i class="fas fa-arrow-circle-right"></i></a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box">
-                                <span class="info-box-icon bg-primary"><i class="fas fa-chart-bar"></i></span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">Hasil ANP</span>
-                                    <span class="info-box-number">Bobot Final</span>
-                                    <a href="<?= base_url('tpp/anp') ?>" class="small-box-footer">Lihat <i class="fas fa-arrow-circle-right"></i></a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                
                     
                     <!-- Quick Actions -->
                     <div class="row mt-4">
@@ -140,7 +93,7 @@ $activeMenu = 'dashboard';
                         <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <h3 class="card-title">Detail Kriteria dan Bobot</h3>
+                                    <h3 class="card-title">Detail Kriteria (Cluster) dan Subkriteria (Node)</h3>
                                 </div>
                                 <div class="card-body p-2">
                                     <?php if (!empty($progressData)): ?>
@@ -148,10 +101,10 @@ $activeMenu = 'dashboard';
                                             <table class="table table-bordered table-sm">
                                                 <thead>
                                                     <tr>
-                                                        <th style="min-width: 150px;">Kriteria</th>
-                                                        <th style="min-width: 120px;">Jumlah Subkriteria</th>
-                                                        <th style="min-width: 100px;">Bobot</th>
-                                                        <th style="min-width: 100px;">Status</th>
+                                                        <th style="min-width: 150px;">Kriteria (Cluster)</th>
+                                                        <th style="min-width: 120px;">Jumlah Subkriteria (Node)</th>
+                                                        <th style="min-width: 100px;">Bobot ANP</th>
+                                                        <th style="min-width: 100px;">Status Bobot</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
