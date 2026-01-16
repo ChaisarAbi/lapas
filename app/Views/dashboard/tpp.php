@@ -16,7 +16,7 @@ $activeMenu = 'dashboard';
                 <div class="card-header">
                     <h3 class="card-title">Tim Pengamat Pemasyarakatan (TPP)</h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body p-3">
                     <p>Selamat datang di dashboard Tim Pengamat Pemasyarakatan. Anda bertanggung jawab untuk:</p>
                     <ul>
                         <li>Mengelola kriteria penilaian pembinaan narapidana</li>
@@ -87,7 +87,7 @@ $activeMenu = 'dashboard';
                                 <div class="card-header">
                                     <h3 class="card-title">Aksi Cepat - Analytic Network Process (ANP)</h3>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body p-2">
                                     <div class="row">
                                         <div class="col-md-3">
                                             <div class="card bg-info">
@@ -142,25 +142,25 @@ $activeMenu = 'dashboard';
                                 <div class="card-header">
                                     <h3 class="card-title">Detail Kriteria dan Bobot</h3>
                                 </div>
-                                <div class="card-body">
+                                <div class="card-body p-2">
                                     <?php if (!empty($progressData)): ?>
-                                        <div class="table-responsive">
-                                            <table class="table table-bordered">
+                                        <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                                            <table class="table table-bordered table-sm">
                                                 <thead>
                                                     <tr>
-                                                        <th>Kriteria</th>
-                                                        <th>Jumlah Subkriteria</th>
-                                                        <th>Bobot</th>
-                                                        <th>Status</th>
+                                                        <th style="min-width: 150px;">Kriteria</th>
+                                                        <th style="min-width: 120px;">Jumlah Subkriteria</th>
+                                                        <th style="min-width: 100px;">Bobot</th>
+                                                        <th style="min-width: 100px;">Status</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <?php foreach ($progressData as $item): ?>
                                                     <tr>
                                                         <td><?= $item['kriteria'] ?></td>
-                                                        <td><?= $item['subkriteria'] ?></td>
-                                                        <td><?= number_format($item['bobot'], 3) ?></td>
-                                                        <td>
+                                                        <td class="text-center"><?= $item['subkriteria'] ?></td>
+                                                        <td class="text-right"><?= number_format($item['bobot'], 3) ?></td>
+                                                        <td class="text-center">
                                                             <?php if ($item['bobot'] > 0): ?>
                                                                 <span class="badge badge-success">Sudah diisi</span>
                                                             <?php else: ?>
