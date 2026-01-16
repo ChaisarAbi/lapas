@@ -38,6 +38,7 @@ $activeMenu = 'dashboard';
                                 <div class="info-box-content">
                                     <span class="info-box-text">Total Kriteria</span>
                                     <span class="info-box-number"><?= $totalKriteria ?? 0 ?></span>
+                                    <a href="<?= base_url('tpp/kriteria') ?>" class="small-box-footer">Kelola <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
                             </div>
                         </div>
@@ -47,6 +48,7 @@ $activeMenu = 'dashboard';
                                 <div class="info-box-content">
                                     <span class="info-box-text">Subkriteria</span>
                                     <span class="info-box-number"><?= $totalSubkriteria ?? 0 ?></span>
+                                    <a href="<?= base_url('tpp/subkriteria') ?>" class="small-box-footer">Kelola <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
                             </div>
                         </div>
@@ -62,15 +64,72 @@ $activeMenu = 'dashboard';
                                     <span class="progress-description">
                                         <?= $persentaseBobot ?? 0 ?>% dari total
                                     </span>
+                                    <a href="<?= base_url('tpp/bobot') ?>" class="small-box-footer">Input Bobot <i class="fas fa-arrow-circle-right"></i></a>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="info-box">
-                                <span class="info-box-icon bg-primary"><i class="fas fa-calendar-alt"></i></span>
+                                <span class="info-box-icon bg-primary"><i class="fas fa-project-diagram"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Periode Aktif</span>
-                                    <span class="info-box-number"><?= $periodeAktif ?? date('Y-m') ?></span>
+                                    <span class="info-box-text">ANP</span>
+                                    <span class="info-box-number">Analytic Network Process</span>
+                                    <a href="<?= base_url('tpp/anp') ?>" class="small-box-footer">Proses ANP <i class="fas fa-arrow-circle-right"></i></a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Aksi Cepat - Analytic Network Process (ANP)</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="card bg-info">
+                                                <div class="card-body text-center">
+                                                    <i class="fas fa-balance-scale fa-3x mb-3"></i>
+                                                    <h5>Kelola Kriteria</h5>
+                                                    <p>Atur kriteria dan subkriteria penilaian</p>
+                                                    <a href="<?= base_url('tpp/kriteria') ?>" class="btn btn-light btn-block">Akses</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card bg-success">
+                                                <div class="card-body text-center">
+                                                    <i class="fas fa-calculator fa-3x mb-3"></i>
+                                                    <h5>Input Bobot</h5>
+                                                    <p>Input bobot awal kriteria</p>
+                                                    <a href="<?= base_url('tpp/bobot') ?>" class="btn btn-light btn-block">Akses</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card bg-warning">
+                                                <div class="card-body text-center">
+                                                    <i class="fas fa-project-diagram fa-3x mb-3"></i>
+                                                    <h5>Input Interdependensi</h5>
+                                                    <p>Input matriks interdependensi ANP</p>
+                                                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="btn btn-light btn-block">Akses</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card bg-primary">
+                                                <div class="card-body text-center">
+                                                    <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                                                    <h5>Hasil ANP</h5>
+                                                    <p>Lihat hasil perhitungan ANP</p>
+                                                    <a href="<?= base_url('tpp/anp') ?>" class="btn btn-light btn-block">Akses</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
