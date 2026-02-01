@@ -33,7 +33,7 @@ class AnpModel extends Model
     protected $validationRules = [
         'cluster_id_dari' => 'required|integer',
         'cluster_id_ke' => 'required|integer',
-        'nilai' => 'required|decimal|greater_than[0]',
+        'nilai' => 'required|decimal|greater_than_equal_to[0]',
         'tipe' => 'required|in_list[cluster_to_cluster,element_to_element,cluster_to_element,element_to_cluster]',
         'periode_id' => 'permit_empty|integer'
     ];
@@ -99,6 +99,10 @@ class AnpModel extends Model
         $saved = 0;
         foreach ($data as $item) {
             $item['periode_id'] = $periodeId;
+            // Pastikan tipe diisi jika kosong
+            if (empty($item['tipe'])) {
+                $item['tipe'] = 'element_to_element';
+            }
             if ($this->save($item)) {
                 $saved++;
             }
@@ -110,15 +114,15 @@ class AnpModel extends Model
     /**
      * Build supermatrix from interdependensi data
      */
-    public function buildSupermatrix($kriteria, $interdependensi, $clusters)
+    public function buildSupermatrix($subkriteria, $interdependensi, $clusters)
     {
-        $n = count($kriteria);
+        $n = count($subkriteria);
         $supermatrix = array_fill(0, $n, array_fill(0, $n, 0.0));
 
-        // Map kriteria id to index
+        // Map subkriteria id to index (karena subkriteria adalah node/element dalam ANP)
         $indexMap = [];
-        foreach ($kriteria as $index => $k) {
-            $indexMap[$k['id']] = $index;
+        foreach ($subkriteria as $index => $sk) {
+            $indexMap[$sk['id']] = $index;
         }
 
         // Fill supermatrix with interdependensi values
@@ -175,21 +179,110 @@ class AnpModel extends Model
     }
 
     /**
-     * Calculate eigenvalues using power method (simplified)
+     * Calculate eigenvalues using power method (optimized)
      */
     private function calculateEigenvalues($matrix)
     {
         $n = count($matrix);
-        $eigenvalues = [];
-
-        // Simplified calculation - for ANP we use different approach
-        // This is a placeholder for actual eigenvalue calculation
-        for ($i = 0; $i < $n; $i++) {
-            $rowSum = array_sum($matrix[$i]);
-            $eigenvalues[] = $rowSum / $n;
+        if ($n == 0) return [];
+        
+        // Cache untuk matriks yang sama (simple caching)
+        static $cache = [];
+        $cacheKey = md5(serialize($matrix));
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
         }
 
-        return $eigenvalues;
+        // Power method to find dominant eigenvalue (optimized)
+        $maxIterations = 50; // Reduced from 100
+        $tolerance = 0.00001; // More precise
+        
+        // Start with uniform vector (optimized initialization)
+        $vector = array_fill(0, $n, 1.0 / $n);
+        $eigenvalue = 0;
+        
+        for ($iter = 0; $iter < $maxIterations; $iter++) {
+            // Multiply matrix by vector (optimized)
+            $newVector = $this->matrixVectorMultiply($matrix, $vector);
+            
+            // Calculate eigenvalue using Rayleigh quotient (optimized)
+            $numerator = $this->dotProduct($newVector, $vector);
+            $denominator = $this->dotProduct($vector, $vector);
+            
+            if ($denominator > 0) {
+                $newEigenvalue = $numerator / $denominator;
+            } else {
+                $newEigenvalue = 0;
+            }
+            
+            // Normalize new vector (optimized)
+            $norm = sqrt($this->dotProduct($newVector, $newVector));
+            if ($norm > 0) {
+                $scale = 1.0 / $norm;
+                for ($i = 0; $i < $n; $i++) {
+                    $newVector[$i] *= $scale;
+                }
+            }
+            
+            // Check convergence
+            $diff = 0;
+            $eigenvalueDiff = abs($newEigenvalue - $eigenvalue);
+            for ($i = 0; $i < $n; $i++) {
+                $diff += abs($newVector[$i] - $vector[$i]);
+            }
+            
+            $vector = $newVector;
+            $eigenvalue = $newEigenvalue;
+            
+            // Check both vector and eigenvalue convergence
+            if ($diff < $tolerance && $eigenvalueDiff < $tolerance) {
+                $result = [$eigenvalue];
+                $cache[$cacheKey] = $result; // Cache the result
+                return $result;
+            }
+        }
+        
+        // If not converged, use trace/n as approximation (optimized)
+        $trace = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $trace += $matrix[$i][$i];
+        }
+        $result = [$trace / $n];
+        $cache[$cacheKey] = $result; // Cache the result
+        return $result;
+    }
+    
+    /**
+     * Optimized matrix-vector multiplication
+     */
+    private function matrixVectorMultiply($matrix, $vector)
+    {
+        $n = count($matrix);
+        $result = array_fill(0, $n, 0.0);
+        
+        for ($i = 0; $i < $n; $i++) {
+            $sum = 0;
+            $row = $matrix[$i];
+            for ($j = 0; $j < $n; $j++) {
+                $sum += $row[$j] * $vector[$j];
+            }
+            $result[$i] = $sum;
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Optimized dot product
+     */
+    private function dotProduct($a, $b)
+    {
+        $n = count($a);
+        $sum = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $sum += $a[$i] * $b[$i];
+        }
+        return $sum;
     }
 
     /**
@@ -270,15 +363,21 @@ class AnpModel extends Model
     /**
      * Extract weights from limit supermatrix
      */
-    public function extractWeights($limitSupermatrix, $kriteria)
+    public function extractWeights($limitSupermatrix, $subkriteria)
     {
         $n = count($limitSupermatrix);
+        if ($n == 0) return [];
+        
         $weights = [];
         
-        // Take the first column as weights (simplified approach)
-        // In proper ANP, we take the column corresponding to the goal
+        // In ANP, weights are typically taken from the limit supermatrix
+        // We can take the average of each row (or column) as the weight
         for ($i = 0; $i < $n; $i++) {
-            $weights[$i] = $limitSupermatrix[$i][0];
+            $rowSum = 0;
+            for ($j = 0; $j < $n; $j++) {
+                $rowSum += $limitSupermatrix[$i][$j];
+            }
+            $weights[$i] = $rowSum / $n; // Average of row
         }
         
         // Normalize weights to sum to 1
@@ -289,17 +388,97 @@ class AnpModel extends Model
             }
         }
         
-        // Map weights to kriteria
+        // Map weights to subkriteria (NOT kriteria)
         $result = [];
-        foreach ($kriteria as $index => $k) {
+        foreach ($subkriteria as $index => $sk) {
             $result[] = [
-                'kriteria_id' => $k['id'],
-                'kode' => $k['kode'],
-                'nama' => $k['nama'],
+                'subkriteria_id' => $sk['id'],
+                'kriteria_id' => $sk['kriteria_id'],
+                'kode' => $sk['kode'],
+                'nama' => $sk['nama'],
+                'kriteria_nama' => $sk['kriteria_nama'],
                 'weight' => isset($weights[$index]) ? $weights[$index] : 0
             ];
         }
         
         return $result;
+    }
+
+    /**
+     * Get histori pairwise comparison
+     */
+    public function getHistoriPairwise($periodeId = null)
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('anp_pairwise_histori');
+        
+        if ($periodeId) {
+            $builder->where('periode_id', $periodeId);
+        }
+        
+        $builder->orderBy('created_at', 'DESC');
+        return $builder->get()->getResultArray();
+    }
+
+    /**
+     * Build interdependensi matrix from histori pairwise data
+     */
+    public function bangunMatriksDariHistori($periodeId = null)
+    {
+        log_message('debug', '=== MULAI bangunMatriksDariHistori ===');
+        log_message('debug', 'Periode ID: ' . $periodeId);
+
+        // Ambil data histori pairwise
+        $historiData = $this->getHistoriPairwise($periodeId);
+        log_message('debug', 'Jumlah data histori: ' . count($historiData));
+
+        if (empty($historiData)) {
+            log_message('debug', 'Tidak ada data histori pairwise ditemukan');
+            return null;
+        }
+
+        // Ambil subkriteria untuk mapping
+        $subkriteriaModel = new \App\Models\SubkriteriaModel();
+        $subkriteria = $subkriteriaModel->findAll();
+        log_message('debug', 'Jumlah subkriteria: ' . count($subkriteria));
+
+        // Buat mapping dari subkriteria_id ke index matriks
+        $nodeIds = [];
+        foreach ($subkriteria as $sk) {
+            $nodeIds[] = $sk['id'];
+        }
+        log_message('debug', 'Node IDs: ' . json_encode($nodeIds));
+
+        $n = count($nodeIds);
+        $matriks = array_fill(0, $n, array_fill(0, $n, 0.0));
+
+        // Isi matriks dengan data histori
+        $dataCount = 0;
+        foreach ($historiData as $row) {
+            $indexDari = array_search($row['node_dari_id'], $nodeIds);
+            $indexKe = array_search($row['node_ke_id'], $nodeIds);
+
+            log_message('debug', 'Processing: node_dari_id=' . $row['node_dari_id'] . ' -> indexDari=' . $indexDari);
+            log_message('debug', 'Processing: node_ke_id=' . $row['node_ke_id'] . ' -> indexKe=' . $indexKe);
+
+            if ($indexDari !== false && $indexKe !== false) {
+                $nilai = (float)$row['skala'];
+                $matriks[$indexDari][$indexKe] = $nilai;
+                $dataCount++;
+                log_message('debug', 'Set matriks[' . $indexDari . '][' . $indexKe . '] = ' . $nilai);
+            } else {
+                log_message('debug', 'Mapping gagal untuk node_dari_id=' . $row['node_dari_id'] . ' atau node_ke_id=' . $row['node_ke_id']);
+            }
+        }
+
+        log_message('debug', 'Jumlah data yang berhasil dimasukkan: ' . $dataCount);
+
+        // Set diagonal ke 1 (self-comparison)
+        for ($i = 0; $i < $n; $i++) {
+            $matriks[$i][$i] = 1.0;
+        }
+
+        log_message('debug', '=== SELESAI bangunMatriksDariHistori ===');
+        return $matriks;
     }
 }

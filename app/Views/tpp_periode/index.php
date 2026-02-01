@@ -6,7 +6,7 @@ $activeMenu = 'periode';
 ?>
 
 <?= $this->section('breadcrumb') ?>
-    <li class="breadcrumb-item"><a href="<?= base_url('tpp/dashboard') ?>">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="<?= base_url('admin/dashboard') ?>">Dashboard</a></li>
     <li class="breadcrumb-item active">Kelola Periode</li>
 <?= $this->endSection() ?>
 
@@ -17,7 +17,7 @@ $activeMenu = 'periode';
                 <div class="card-header">
                     <h3 class="card-title">Kelola Periode Penilaian</h3>
                     <div class="card-tools">
-                        <a href="<?= base_url('tpp/periode/create') ?>" class="btn btn-primary btn-sm">
+                        <a href="<?= base_url('admin/periode/create') ?>" class="btn btn-primary btn-sm">
                             <i class="fas fa-plus"></i> Tambah Periode
                         </a>
                     </div>
@@ -86,15 +86,15 @@ $activeMenu = 'periode';
                                     <td>
                                         <div class="btn-group">
                                             <?php if ($periode['status'] != 'aktif'): ?>
-                                                <a href="<?= base_url('tpp/periode/set-active/' . $periode['id']) ?>" class="btn btn-success btn-sm" title="Aktifkan">
+                                                <a href="<?= base_url('admin/periode/set-active/' . $periode['id']) ?>" class="btn btn-success btn-sm" title="Aktifkan">
                                                     <i class="fas fa-check"></i>
                                                 </a>
                                             <?php endif; ?>
-                                            <a href="<?= base_url('tpp/periode/edit/' . $periode['id']) ?>" class="btn btn-warning btn-sm" title="Edit">
+                                            <a href="<?= base_url('admin/periode/edit/' . $periode['id']) ?>" class="btn btn-warning btn-sm" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             <?php if ($periode['status'] != 'aktif'): ?>
-                                                <a href="<?= base_url('tpp/periode/delete/' . $periode['id']) ?>" class="btn btn-danger btn-sm" title="Hapus" onclick="return confirm('Apakah Anda yakin ingin menghapus periode ini?')">
+                                                <a href="<?= base_url('admin/periode/delete/' . $periode['id']) ?>" class="btn btn-danger btn-sm" title="Hapus" onclick="return confirm('Apakah Anda yakin ingin menghapus periode ini?')">
                                                     <i class="fas fa-trash"></i>
                                                 </a>
                                             <?php endif; ?>
@@ -109,7 +109,7 @@ $activeMenu = 'periode';
                     <?php if (empty($periodes)): ?>
                         <div class="alert alert-info text-center">
                             <i class="fas fa-info-circle"></i> Belum ada periode penilaian. 
-                            <a href="<?= base_url('tpp/periode/create') ?>">Tambah periode baru</a>.
+                            <a href="<?= base_url('admin/periode/create') ?>">Tambah periode baru</a>.
                         </div>
                     <?php endif; ?>
                 </div>

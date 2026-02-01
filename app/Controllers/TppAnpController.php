@@ -31,17 +31,52 @@ class TppAnpController extends BaseController
         // Ambil semua subkriteria (node ANP)
         $subkriteria = $this->subkriteriaModel->getWithKriteria();
         
-        // Ambil data interdependensi ANP
-        $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
+        // Validasi: minimal harus ada subkriteria
+        if (empty($subkriteria)) {
+            return view('tpp_anp/index', [
+                'title' => 'Hasil Analytic Network Process (ANP) - SPK Pembinaan',
+                'subkriteria' => [],
+                'interdependensi' => [],
+                'hasilAnp' => null,
+                'periode' => $periodeAktif,
+                'activeMenu' => 'hasil-anp',
+                'error' => 'Tidak ada subkriteria yang tersedia. Silakan tambahkan subkriteria terlebih dahulu.'
+            ]);
+        }
         
-        // Jika tidak ada data interdependensi, buat default
-        if (empty($interdependensi)) {
+        // Gunakan bangunMatriksDariHistori untuk mendapatkan matriks interdependensi
+        log_message('debug', '=== MULAI index() ===');
+        log_message('debug', 'Periode ID: ' . $periodeId);
+        log_message('debug', 'Jumlah subkriteria: ' . count($subkriteria));
+        
+        $matriksInterdependensi = $this->anpModel->bangunMatriksDariHistori($periodeId);
+        
+        if ($matriksInterdependensi === null) {
+            log_message('debug', 'Matriks interdependensi kosong, menggunakan default');
+            // Jika tidak ada data histori, gunakan default
             $interdependensi = $this->buatInterdependensiDefault($subkriteria, $periodeId);
+        } else {
+            log_message('debug', 'Matriks interdependensi berhasil dibangun dari histori');
+            // Konversi matriks ke format interdependensi
+            $interdependensi = $this->konversiMatriksKeInterdependensi($matriksInterdependensi, $subkriteria, $periodeId);
         }
         
         // Bangun supermatrix dari interdependensi
         $clusters = $this->getClusters();
         $supermatrix = $this->anpModel->buildSupermatrix($subkriteria, $interdependensi, $clusters);
+        
+        // Validasi supermatrix sebelum perhitungan
+        if (!$this->validasiSupermatrix($supermatrix)) {
+            return view('tpp_anp/index', [
+                'title' => 'Hasil Analytic Network Process (ANP) - SPK Pembinaan',
+                'subkriteria' => $subkriteria,
+                'interdependensi' => $interdependensi,
+                'hasilAnp' => null,
+                'periode' => $periodeAktif,
+                'activeMenu' => 'hasil-anp',
+                'error' => 'Matriks interdependensi tidak valid. Pastikan semua nilai telah diisi dengan benar.'
+            ]);
+        }
         
         // Hitung hasil ANP lengkap
         $hasilAnp = $this->hitungANPLengkap($supermatrix, $subkriteria);
@@ -55,6 +90,7 @@ class TppAnpController extends BaseController
             'activeMenu' => 'hasil-anp'
         ];
         
+        log_message('debug', '=== SELESAI index() ===');
         return view('tpp_anp/index', $data);
     }
 
@@ -91,28 +127,71 @@ class TppAnpController extends BaseController
     private function hitungANPLengkap($supermatrix, $subkriteria)
     {
         $n = count($supermatrix);
+        log_message('debug', "HitungANPLengkap: Mulai perhitungan dengan n=$n");
+        log_message('debug', "HitungANPLengkap: Jumlah subkriteria=" . count($subkriteria));
         
-        // 1. Hitung konsistensi
+        // 1. Hitung konsistensi matriks interdependensi
+        log_message('debug', "HitungANPLengkap: Menghitung konsistensi");
         $konsistensi = $this->anpModel->calculateConsistency($supermatrix);
+        log_message('debug', "HitungANPLengkap: Konsistensi selesai. Lambda max=" . $konsistensi['lambda_max']);
         
-        // 2. Normalisasi supermatrix (unweighted supermatrix)
+        // 2. Normalisasi supermatrix (unweighted supermatrix) - kolom sum = 1
+        log_message('debug', "HitungANPLengkap: Normalisasi supermatrix");
         $unweightedSupermatrix = $this->anpModel->normalizeSupermatrix($supermatrix);
         
-        // 3. Buat weighted supermatrix (dalam ANP sederhana, sama dengan unweighted)
-        $weightedSupermatrix = $unweightedSupermatrix;
+        // 3. Buat weighted supermatrix dengan cluster weights
+        // Dalam implementasi sederhana, kita gunakan equal cluster weights
+        log_message('debug', "HitungANPLengkap: Apply cluster weights");
+        $weightedSupermatrix = $this->applyClusterWeights($unweightedSupermatrix, $subkriteria);
         
-        // 4. Hitung limit supermatrix (konvergensi)
-        $limitSupermatrix = $this->anpModel->calculateLimitSupermatrix($weightedSupermatrix);
+        // 4. Hitung limit supermatrix (konvergensi) dengan power method
+        log_message('debug', "HitungANPLengkap: Menghitung limit supermatrix");
+        $limitSupermatrix = $this->anpModel->calculateLimitSupermatrix($weightedSupermatrix, 50, 0.00001);
         
-        // 5. Ekstrak bobot dari limit supermatrix
+        // 5. Ekstrak bobot dari limit supermatrix (kolom pertama yang sudah konvergen)
+        log_message('debug', "HitungANPLengkap: Ekstrak weights dari limit supermatrix");
         $bobot = $this->anpModel->extractWeights($limitSupermatrix, $subkriteria);
+        log_message('debug', "HitungANPLengkap: Jumlah bobot yang diekstrak=" . count($bobot));
         
-        // 6. Hitung bobot akhir (normalisasi)
+        // Cek apakah bobot valid
+        if (empty($bobot)) {
+            log_message('error', "HitungANPLengkap: Bobot kosong setelah ekstraksi");
+            // Return default bobot jika ekstraksi gagal
+            $bobot = [];
+            foreach ($subkriteria as $index => $sk) {
+                $bobot[] = [
+                    'subkriteria_id' => $sk['id'],
+                    'kriteria_id' => $sk['kriteria_id'],
+                    'kode' => $sk['kode'],
+                    'nama' => $sk['nama'],
+                    'kriteria_nama' => $sk['kriteria_nama'],
+                    'weight' => 1.0 / count($subkriteria)
+                ];
+            }
+        }
+        
+        // 6. Hitung bobot akhir (normalisasi agar total = 1)
         $totalBobot = array_sum(array_column($bobot, 'weight'));
+        log_message('debug', "HitungANPLengkap: Total bobot sebelum normalisasi=" . $totalBobot);
+        
         $bobotAkhir = [];
         foreach ($bobot as $item) {
             $bobotAkhir[] = $totalBobot > 0 ? $item['weight'] / $totalBobot : 0;
         }
+        
+        // 7. Validasi: total bobot akhir harus = 1 (dengan toleransi)
+        $totalAkhir = array_sum($bobotAkhir);
+        log_message('debug', "HitungANPLengkap: Total bobot akhir=" . $totalAkhir);
+        
+        if (abs($totalAkhir - 1.0) > 0.0001) {
+            // Normalisasi ulang jika diperlukan
+            foreach ($bobotAkhir as &$bobot) {
+                $bobot = $totalAkhir > 0 ? $bobot / $totalAkhir : 0;
+            }
+            log_message('debug', "HitungANPLengkap: Normalisasi ulang dilakukan");
+        }
+        
+        log_message('debug', "HitungANPLengkap: Perhitungan selesai");
         
         return [
             'n' => $n,
@@ -126,11 +205,51 @@ class TppAnpController extends BaseController
             'supermatrix' => $supermatrix,
             'unweighted_supermatrix' => $unweightedSupermatrix,
             'weighted_supermatrix' => $weightedSupermatrix,
-            'limit_supermatrix' => $limitSupermatrix
+            'limit_supermatrix' => $limitSupermatrix,
+            'total_bobot_akhir' => array_sum($bobotAkhir)
         ];
     }
+    
+    private function applyClusterWeights($unweightedSupermatrix, $subkriteria)
+    {
+        $n = count($unweightedSupermatrix);
+        $weightedSupermatrix = $unweightedSupermatrix;
+        
+        // Hitung jumlah cluster (kriteria) yang unik
+        $uniqueKriteriaIds = array_unique(array_column($subkriteria, 'kriteria_id'));
+        $clusterCount = count($uniqueKriteriaIds);
+        
+        if ($clusterCount == 0) {
+            return $weightedSupermatrix;
+        }
+        
+        // Buat mapping cluster id ke weight (equal weights)
+        $clusterWeight = 1.0 / $clusterCount;
+        
+        // Buat mapping index ke cluster id
+        $indexToCluster = [];
+        foreach ($subkriteria as $index => $sk) {
+            $indexToCluster[$index] = $sk['kriteria_id'];
+        }
+        
+        // Apply cluster weights to supermatrix
+        // Dalam ANP, weighted supermatrix = unweighted supermatrix * cluster weights
+        // Untuk setiap sel (i,j), kalikan dengan weight cluster dari baris i
+        for ($i = 0; $i < $n; $i++) {
+            $rowClusterId = $indexToCluster[$i] ?? null;
+            if ($rowClusterId !== null) {
+                for ($j = 0; $j < $n; $j++) {
+                    if (isset($weightedSupermatrix[$i][$j])) {
+                        $weightedSupermatrix[$i][$j] *= $clusterWeight;
+                    }
+                }
+            }
+        }
+        
+        return $weightedSupermatrix;
+    }
 
-    public function inputInterdependensi()
+    public function pairwiseComparison()
     {
         // Ambil periode aktif
         $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
@@ -139,18 +258,462 @@ class TppAnpController extends BaseController
         // Ambil semua subkriteria dengan info kriteria
         $subkriteria = $this->subkriteriaModel->getWithKriteria();
         
-        // Ambil data interdependensi yang sudah ada
-        $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
+        // Ambil histori pairwise dari database
+        $historiPairwise = $this->anpModel->getHistoriPairwise($periodeId);
+        
+        // Bangun matriks interdependensi dari histori
+        $matriksInterdependensi = $this->bangunMatriksDariHistori($subkriteria, $historiPairwise);
+        
+        // Group subkriteria by cluster (kriteria) untuk dropdown
+        $clusters = [];
+        foreach ($subkriteria as $sk) {
+            $clusterId = $sk['kriteria_id'];
+            if (!isset($clusters[$clusterId])) {
+                $clusters[$clusterId] = [
+                    'id' => $clusterId,
+                    'nama' => $sk['kriteria_nama'],
+                    'nodes' => []
+                ];
+            }
+            $clusters[$clusterId]['nodes'][] = $sk;
+        }
         
         $data = [
-            'title' => 'Input Matriks Interdependensi ANP - SPK Pembinaan',
+            'title' => 'Pairwise Comparison ANP - SPK Pembinaan',
             'subkriteria' => $subkriteria,
-            'interdependensi' => $interdependensi,
+            'clusters' => array_values($clusters), // Convert associative array to indexed array
+            'histori_pairwise' => $historiPairwise,
+            'matriks_interdependensi' => $matriksInterdependensi,
             'periode' => $periodeAktif,
-            'activeMenu' => 'input-interdependensi'
+            'activeMenu' => 'pairwise-comparison'
         ];
         
-        return view('tpp_anp/input_interdependensi', $data);
+        return view('tpp_anp/pairwise_comparison', $data);
+    }
+    
+    private function bangunMatriksDariHistori($subkriteria, $historiPairwise)
+    {
+        $n = count($subkriteria);
+        $matriks = array_fill(0, $n, array_fill(0, $n, 0));
+        
+        // Mapping id subkriteria ke index
+        $idToIndex = [];
+        foreach ($subkriteria as $index => $sk) {
+            $idToIndex[$sk['id']] = $index;
+        }
+        
+        // Isi matriks dari histori
+        foreach ($historiPairwise as $histori) {
+            $dariIndex = $idToIndex[$histori['node_dari_id']] ?? null;
+            $keIndex = $idToIndex[$histori['node_ke_id']] ?? null;
+            
+            if ($dariIndex !== null && $keIndex !== null) {
+                $matriks[$dariIndex][$keIndex] = $histori['skala'];
+                // Set nilai kebalikan (reciprocal)
+                if ($histori['skala'] > 0) {
+                    $matriks[$keIndex][$dariIndex] = 1 / $histori['skala'];
+                }
+            }
+        }
+        
+        // Set diagonal = 1
+        for ($i = 0; $i < $n; $i++) {
+            $matriks[$i][$i] = 1;
+        }
+        
+        return $matriks;
+    }
+
+    public function simpanPairwise()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        $periodeId = $periodeAktif['id'];
+        
+        // Ambil data dari POST
+        $nodeDari = $this->request->getPost('node_dari');
+        $nodeKe = $this->request->getPost('node_ke');
+        $skala = $this->request->getPost('skala');
+        
+        // Validasi
+        if (!$nodeDari || !$nodeKe || !$skala) {
+            return redirect()->back()->withInput()->with('error', 'Semua field harus diisi.');
+        }
+        
+        if ($nodeDari == $nodeKe) {
+            return redirect()->back()->withInput()->with('error', 'Node dari dan node ke tidak boleh sama.');
+        }
+        
+        $skala = floatval($skala);
+        if ($skala < 1 || $skala > 9) {
+            return redirect()->back()->withInput()->with('error', 'Skala harus antara 1-9.');
+        }
+        
+        // Ambil data subkriteria
+        $subkriteriaDari = $this->subkriteriaModel->find($nodeDari);
+        $subkriteriaKe = $this->subkriteriaModel->find($nodeKe);
+        
+        if (!$subkriteriaDari || !$subkriteriaKe) {
+            return redirect()->back()->withInput()->with('error', 'Data subkriteria tidak ditemukan.');
+        }
+        
+        // Cek apakah pairwise sudah ada
+        $db = \Config\Database::connect();
+        $existing = $db->table('anp_pairwise_histori')
+            ->where('periode_id', $periodeId)
+            ->where('node_dari_id', $nodeDari)
+            ->where('node_ke_id', $nodeKe)
+            ->get()
+            ->getRowArray();
+        
+        if ($existing) {
+            // Update existing
+            $db->table('anp_pairwise_histori')
+                ->where('id', $existing['id'])
+                ->update([
+                    'skala' => $skala,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            $message = 'Pairwise berhasil diperbarui.';
+        } else {
+            // Insert new
+            $db->table('anp_pairwise_histori')->insert([
+                'periode_id' => $periodeId,
+                'node_dari_id' => $nodeDari,
+                'node_dari_kode' => $subkriteriaDari['kode'],
+                'node_dari_nama' => $subkriteriaDari['nama'],
+                'node_ke_id' => $nodeKe,
+                'node_ke_kode' => $subkriteriaKe['kode'],
+                'node_ke_nama' => $subkriteriaKe['nama'],
+                'skala' => $skala,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+            $message = 'Pairwise berhasil ditambahkan.';
+        }
+        
+        return redirect()->to('/tpp/anp/pairwise-comparison')->with('success', $message);
+    }
+    
+    public function hapusPairwise($id)
+    {
+        $db = \Config\Database::connect();
+        $deleted = $db->table('anp_pairwise_histori')->where('id', $id)->delete();
+        
+        if ($deleted) {
+            return redirect()->to('/tpp/anp/pairwise-comparison')->with('success', 'Pairwise berhasil dihapus.');
+        } else {
+            return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Gagal menghapus pairwise.');
+        }
+    }
+    
+    public function hitungAnp()
+    {
+        try {
+            log_message('info', 'Mulai proses hitung ANP');
+            
+            // Cek apakah request AJAX
+            $isAjax = $this->request->isAJAX();
+            
+            // Ambil periode aktif
+            $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+            if (!$periodeAktif) {
+                log_message('error', 'Tidak ada periode aktif');
+                if ($isAjax) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.'
+                    ]);
+                }
+                return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+            }
+            $periodeId = $periodeAktif['id'];
+            log_message('info', 'Periode aktif ditemukan: ' . $periodeId);
+            
+            // Ambil semua subkriteria
+            $subkriteria = $this->subkriteriaModel->getWithKriteria();
+            if (empty($subkriteria)) {
+                log_message('error', 'Tidak ada subkriteria yang tersedia');
+                if ($isAjax) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Tidak ada subkriteria yang tersedia. Silakan tambahkan subkriteria terlebih dahulu.'
+                    ]);
+                }
+                return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Tidak ada subkriteria yang tersedia. Silakan tambahkan subkriteria terlebih dahulu.');
+            }
+            $n = count($subkriteria);
+            log_message('info', 'Jumlah subkriteria: ' . $n);
+            
+            // Ambil histori pairwise
+            $historiPairwise = $this->anpModel->getHistoriPairwise($periodeId);
+            if (empty($historiPairwise)) {
+                log_message('error', 'Belum ada data pairwise comparison');
+                if ($isAjax) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Belum ada data pairwise comparison. Silakan isi pairwise comparison terlebih dahulu.'
+                    ]);
+                }
+                return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Belum ada data pairwise comparison. Silakan isi pairwise comparison terlebih dahulu.');
+            }
+            log_message('info', 'Jumlah histori pairwise: ' . count($historiPairwise));
+            
+            // Bangun matriks interdependensi
+            $matriksInterdependensi = $this->bangunMatriksDariHistori($subkriteria, $historiPairwise);
+            log_message('info', 'Matriks interdependensi berhasil dibangun');
+            
+            // Validasi matriks interdependensi
+            $validCount = 0;
+            $totalPairs = $n * $n;
+            for ($i = 0; $i < $n; $i++) {
+                for ($j = 0; $j < $n; $j++) {
+                    if ($matriksInterdependensi[$i][$j] > 0) {
+                        $validCount++;
+                    }
+                }
+            }
+            
+            $persentase = ($totalPairs > 0) ? round(($validCount / $totalPairs) * 100, 1) : 0;
+            log_message('info', 'Valid count: ' . $validCount . '/' . $totalPairs . ' (' . $persentase . '%)');
+            
+            // Kurangi threshold validasi dari 50% menjadi 30%
+            if ($validCount < ($n * 0.3)) {
+                log_message('error', 'Data pairwise belum cukup: ' . $validCount . ' < ' . ($n * 0.3));
+                if ($isAjax) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Data pairwise belum cukup. Minimal diperlukan 30% data untuk perhitungan ANP. Saat ini: ' . $persentase . '%'
+                    ]);
+                }
+                return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Data pairwise belum cukup. Minimal diperlukan 30% data untuk perhitungan ANP. Saat ini: ' . $persentase . '%');
+            }
+            
+            // Konversi ke format yang diharapkan oleh model ANP
+            $interdependensiData = [];
+            for ($i = 0; $i < $n; $i++) {
+                for ($j = 0; $j < $n; $j++) {
+                    $interdependensiData[] = [
+                        'cluster_id_dari' => $subkriteria[$i]['kriteria_id'],
+                        'cluster_id_ke' => $subkriteria[$j]['kriteria_id'],
+                        'kriteria_id_dari' => $subkriteria[$i]['id'],
+                        'kriteria_id_ke' => $subkriteria[$j]['id'],
+                        'nilai' => $matriksInterdependensi[$i][$j],
+                        'tipe' => 'element_to_element',
+                        'periode_id' => $periodeId
+                    ];
+                }
+            }
+            log_message('info', 'Data interdependensi siap disimpan: ' . count($interdependensiData) . ' records');
+            
+            // Simpan ke tabel interdependensi
+            log_message('info', 'Mulai menyimpan data interdependensi ke database');
+            $saved = $this->anpModel->saveMatrix($interdependensiData, $periodeId);
+            log_message('info', 'Hasil penyimpanan: ' . $saved);
+            
+            if ($saved > 0) {
+                log_message('info', 'Perhitungan ANP berhasil');
+                if ($isAjax) {
+                    return $this->response->setJSON([
+                        'success' => true,
+                        'message' => 'Perhitungan ANP berhasil. Data interdependensi telah disimpan (' . $saved . ' records).',
+                        'redirect_url' => base_url('/tpp/anp')
+                    ]);
+                }
+                return redirect()->to('/tpp/anp')->with('success', 'Perhitungan ANP berhasil. Data interdependensi telah disimpan (' . $saved . ' records).');
+            } else {
+                log_message('error', 'Gagal menyimpan hasil perhitungan ANP');
+                if ($isAjax) {
+                    return $this->response->setJSON([
+                        'success' => false,
+                        'message' => 'Gagal menyimpan hasil perhitungan ANP. Silakan coba lagi.'
+                    ]);
+                }
+                return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Gagal menyimpan hasil perhitungan ANP. Silakan coba lagi.');
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Exception in hitungAnp: ' . $e->getMessage());
+            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
+            if ($isAjax) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Terjadi kesalahan saat menghitung ANP: ' . $e->getMessage()
+                ]);
+            }
+            return redirect()->to('/tpp/anp/pairwise-comparison')->with('error', 'Terjadi kesalahan saat menghitung ANP: ' . $e->getMessage());
+        }
+    }
+    
+    public function autoFillPairwise()
+    {
+        // Cek apakah request AJAX
+        $isAjax = $this->request->isAJAX();
+        
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            if ($isAjax) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.'
+                ]);
+            }
+            return redirect()->back()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        $periodeId = $periodeAktif['id'];
+        
+        // Ambil semua subkriteria
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        $n = count($subkriteria);
+        
+        // Ambil histori pairwise yang sudah ada
+        $db = \Config\Database::connect();
+        $existingPairwise = $db->table('anp_pairwise_histori')
+            ->where('periode_id', $periodeId)
+            ->get()
+            ->getResultArray();
+        
+        // Buat map untuk pairwise yang sudah ada
+        $existingMap = [];
+        foreach ($existingPairwise as $pairwise) {
+            $key = $pairwise['node_dari_id'] . '_' . $pairwise['node_ke_id'];
+            $existingMap[$key] = true;
+        }
+        
+        // Hitung pairwise yang perlu ditambahkan
+        $addedCount = 0;
+        $batchData = [];
+        
+        // Loop untuk semua kombinasi pairwise (kecuali diagonal)
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = 0; $j < $n; $j++) {
+                if ($i != $j) { // Skip diagonal
+                    $nodeDariId = $subkriteria[$i]['id'];
+                    $nodeKeId = $subkriteria[$j]['id'];
+                    $key = $nodeDariId . '_' . $nodeKeId;
+                    $reverseKey = $nodeKeId . '_' . $nodeDariId;
+                    
+                    // Cek apakah pairwise belum ada
+                    if (!isset($existingMap[$key]) && !isset($existingMap[$reverseKey])) {
+                        $batchData[] = [
+                            'periode_id' => $periodeId,
+                            'node_dari_id' => $nodeDariId,
+                            'node_dari_kode' => $subkriteria[$i]['kode'],
+                            'node_dari_nama' => $subkriteria[$i]['nama'],
+                            'node_ke_id' => $nodeKeId,
+                            'node_ke_kode' => $subkriteria[$j]['kode'],
+                            'node_ke_nama' => $subkriteria[$j]['nama'],
+                            'skala' => 1.0,
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s')
+                        ];
+                        $addedCount++;
+                    }
+                }
+            }
+        }
+        
+        // Insert batch jika ada data
+        if (!empty($batchData)) {
+            $db->table('anp_pairwise_histori')->insertBatch($batchData);
+        }
+        
+        if ($addedCount > 0) {
+            $message = "Auto fill berhasil! $addedCount pairwise telah ditambahkan dengan nilai 1.";
+            if ($isAjax) {
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => $message,
+                    'added_count' => $addedCount
+                ]);
+            }
+            return redirect()->to('/tpp/anp/pairwise-comparison')->with('success', $message);
+        } else {
+            $message = 'Semua pairwise sudah terisi. Tidak ada data baru yang ditambahkan.';
+            if ($isAjax) {
+                return $this->response->setJSON([
+                    'success' => true,
+                    'message' => $message,
+                    'added_count' => 0
+                ]);
+            }
+            return redirect()->to('/tpp/anp/pairwise-comparison')->with('info', $message);
+        }
+    }
+    
+    public function autoFillAllPairwise()
+    {
+        // Cek apakah request AJAX
+        $isAjax = $this->request->isAJAX();
+        
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            if ($isAjax) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.'
+                ]);
+            }
+            return redirect()->back()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        $periodeId = $periodeAktif['id'];
+        
+        // Ambil semua subkriteria
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        $n = count($subkriteria);
+        
+        // Hapus semua pairwise yang ada untuk periode ini
+        $db = \Config\Database::connect();
+        $db->table('anp_pairwise_histori')->where('periode_id', $periodeId)->delete();
+        
+        // Buat semua pairwise combination dengan nilai 1
+        $batchData = [];
+        $totalPairs = 0;
+        
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = 0; $j < $n; $j++) {
+                if ($i != $j) { // Skip diagonal
+                    $nodeDariId = $subkriteria[$i]['id'];
+                    $nodeKeId = $subkriteria[$j]['id'];
+                    
+                    $batchData[] = [
+                        'periode_id' => $periodeId,
+                        'node_dari_id' => $nodeDariId,
+                        'node_dari_kode' => $subkriteria[$i]['kode'],
+                        'node_dari_nama' => $subkriteria[$i]['nama'],
+                        'node_ke_id' => $nodeKeId,
+                        'node_ke_kode' => $subkriteria[$j]['kode'],
+                        'node_ke_nama' => $subkriteria[$j]['nama'],
+                        'skala' => 1.0,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ];
+                    $totalPairs++;
+                }
+            }
+        }
+        
+        // Insert batch
+        if (!empty($batchData)) {
+            $db->table('anp_pairwise_histori')->insertBatch($batchData);
+        }
+        
+        $message = "Auto fill semua pairwise berhasil! Total $totalPairs pairwise telah dibuat dengan nilai 1.";
+        if ($isAjax) {
+            return $this->response->setJSON([
+                'success' => true,
+                'message' => $message,
+                'total_pairs' => $totalPairs
+            ]);
+        }
+        return redirect()->to('/tpp/anp/pairwise-comparison')->with('success', $message);
     }
 
     public function simpanInterdependensi()
@@ -200,6 +763,90 @@ class TppAnpController extends BaseController
         }
     }
 
+    /**
+     * Validasi data interdependensi sebelum perhitungan
+     */
+    private function validasiDataInterdependensi($interdependensi, $subkriteria)
+    {
+        $n = count($subkriteria);
+        
+        // Jika tidak ada data interdependensi sama sekali
+        if (empty($interdependensi)) {
+            log_message('debug', 'Validasi interdependensi: Tidak ada data interdependensi');
+            return [
+                'valid' => false,
+                'message' => 'Belum ada data interdependensi. Silakan input matriks interdependensi terlebih dahulu.'
+            ];
+        }
+        
+        // Hitung jumlah data interdependensi yang valid (nilai > 0)
+        $validCount = 0;
+        foreach ($interdependensi as $item) {
+            if ($item['tipe'] === 'element_to_element' && $item['nilai'] > 0) {
+                $validCount++;
+            }
+        }
+        
+        // Kurangi ketatnya validasi - minimal cukup diagonal saja
+        $minimalData = $n; // Cukup diagonal saja (self-comparison)
+        
+        if ($validCount < $minimalData) {
+            $persentase = round(($validCount / ($n * $n)) * 100, 1);
+            log_message('debug', "Validasi interdependensi: Data kurang. Valid: $validCount, Minimal: $minimalData, Persentase: $persentase%");
+            return [
+                'valid' => false,
+                'message' => "Data interdependensi belum cukup ($persentase% terisi). Minimal diperlukan $minimalData data untuk perhitungan."
+            ];
+        }
+        
+        log_message('debug', "Validasi interdependensi: Valid. Valid: $validCount, Minimal: $minimalData");
+        return [
+            'valid' => true,
+            'message' => 'Data interdependensi cukup untuk perhitungan.'
+        ];
+    }
+    
+    /**
+     * Validasi supermatrix sebelum perhitungan
+     */
+    private function validasiSupermatrix($supermatrix)
+    {
+        $n = count($supermatrix);
+        
+        // Cek ukuran matriks
+        if ($n == 0) {
+            return false;
+        }
+        
+        // Cek diagonal harus = 1
+        for ($i = 0; $i < $n; $i++) {
+            if (abs($supermatrix[$i][$i] - 1.0) > 0.0001) {
+                return false;
+            }
+        }
+        
+        // Cek apakah ada nilai yang tidak valid (NaN atau infinity)
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = 0; $j < $n; $j++) {
+                $value = $supermatrix[$i][$j];
+                if (!is_numeric($value) || is_infinite($value) || is_nan($value)) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Validasi total bobot sebelum disimpan
+     */
+    private function validasiTotalBobot($bobotAkhir)
+        {
+        $total = array_sum($bobotAkhir);
+        return abs($total - 1.0) < 0.0001;
+    }
+
     public function simpanBobotAkhir()
     {
         // Ambil bobot akhir dari POST
@@ -211,7 +858,12 @@ class TppAnpController extends BaseController
             return redirect()->back()->withInput()->with('error', 'Tidak ada data bobot yang dikirim');
         }
         
-        // Validasi
+        // Validasi jumlah data harus sama
+        if (count($subkriteriaIds) !== count($bobotAkhir)) {
+            return redirect()->back()->withInput()->with('error', 'Jumlah data subkriteria dan bobot tidak sama');
+        }
+        
+        // Validasi format
         $validation = \Config\Services::validation();
         $validation->setRules([
             'bobot_akhir.*' => 'required|numeric|greater_than_equal_to[0]|less_than_equal_to[1]'
@@ -219,6 +871,12 @@ class TppAnpController extends BaseController
         
         if (!$validation->withRequest($this->request)->run()) {
             return redirect()->back()->withInput()->with('errors', $validation->getErrors());
+        }
+        
+        // Validasi total bobot harus = 1
+        if (!$this->validasiTotalBobot($bobotAkhir)) {
+            $total = array_sum($bobotAkhir);
+            return redirect()->back()->withInput()->with('error', "Total bobot harus = 1. Total saat ini: " . number_format($total, 4));
         }
         
         $updatedCount = 0;
@@ -270,5 +928,87 @@ class TppAnpController extends BaseController
         }
         
         return redirect()->to('/tpp/anp')->with('success', 'Bobot akhir ANP berhasil disimpan ke database! (Subkriteria dan Kriteria telah diperbarui)');
+    }
+    
+    private function konversiMatriksKeInterdependensi($matriksInterdependensi, $subkriteria, $periodeId)
+    {
+        $interdependensi = [];
+        $n = count($subkriteria);
+        
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = 0; $j < $n; $j++) {
+                $interdependensi[] = [
+                    'cluster_id_dari' => $subkriteria[$i]['kriteria_id'],
+                    'cluster_id_ke' => $subkriteria[$j]['kriteria_id'],
+                    'kriteria_id_dari' => $subkriteria[$i]['id'],
+                    'kriteria_id_ke' => $subkriteria[$j]['id'],
+                    'nilai' => $matriksInterdependensi[$i][$j],
+                    'tipe' => 'element_to_element',
+                    'periode_id' => $periodeId
+                ];
+            }
+        }
+        
+        return $interdependensi;
+    }
+
+    public function partialResult()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+        
+        // Ambil semua subkriteria (node ANP)
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        
+        // Validasi: minimal harus ada subkriteria
+        if (empty($subkriteria)) {
+            return view('tpp_anp/partial_anp_result', [
+                'title' => 'Hasil ANP Parsial - SPK Pembinaan',
+                'subkriteria' => [],
+                'periode' => $periodeAktif,
+                'activeMenu' => 'hasil-anp',
+                'error' => 'Tidak ada subkriteria yang tersedia. Silakan tambahkan subkriteria terlebih dahulu.'
+            ]);
+        }
+        
+        // Ambil data interdependensi ANP
+        $interdependensi = $this->anpModel->getElementInterdependensi($periodeId);
+        
+        // Jika tidak ada data interdependensi, buat default
+        if (empty($interdependensi)) {
+            $interdependensi = $this->buatInterdependensiDefault($subkriteria, $periodeId);
+        }
+        
+        // Bangun supermatrix dari interdependensi
+        $clusters = $this->getClusters();
+        $supermatrix = $this->anpModel->buildSupermatrix($subkriteria, $interdependensi, $clusters);
+        
+        // Validasi supermatrix sebelum perhitungan
+        if (!$this->validasiSupermatrix($supermatrix)) {
+            return view('tpp_anp/partial_anp_result', [
+                'title' => 'Hasil ANP Parsial - SPK Pembinaan',
+                'subkriteria' => $subkriteria,
+                'interdependensi' => $interdependensi,
+                'hasilAnp' => null,
+                'periode' => $periodeAktif,
+                'activeMenu' => 'hasil-anp',
+                'error' => 'Matriks interdependensi tidak valid. Pastikan semua nilai telah diisi dengan benar.'
+            ]);
+        }
+        
+        // Hitung hasil ANP lengkap
+        $hasilAnp = $this->hitungANPLengkap($supermatrix, $subkriteria);
+        
+        $data = [
+            'title' => 'Hasil ANP Parsial - SPK Pembinaan',
+            'subkriteria' => $subkriteria,
+            'interdependensi' => $interdependensi,
+            'hasilAnp' => $hasilAnp,
+            'periode' => $periodeAktif,
+            'activeMenu' => 'hasil-anp'
+        ];
+        
+        return view('tpp_anp/partial_anp_result', $data);
     }
 }

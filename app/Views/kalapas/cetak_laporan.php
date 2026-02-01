@@ -111,16 +111,31 @@
         <thead>
             <tr>
                 <th width="5%">Rank</th>
-                <th width="25%">Nama Narapidana</th>
+                <th width="20%">Nama Narapidana</th>
                 <th width="15%">Nomor Registrasi</th>
-                <th width="20%">Kasus</th>
-                <th width="15%">Jarak Positif (D+)</th>
-                <th width="15%">Jarak Negatif (D-)</th>
-                <th width="15%">Nilai Preferensi</th>
+                <th width="15%">Kasus</th>
+                <th width="10%">Jarak Positif (D+)</th>
+                <th width="10%">Jarak Negatif (D-)</th>
+                <th width="10%">Nilai Preferensi</th>
+                <th width="15%">Status Remisi</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($ranking as $index => $item): ?>
+            <?php foreach ($ranking as $index => $item): 
+                // Tentukan status remisi berdasarkan nilai preferensi
+                $statusRemisi = '';
+                $badgeClass = '';
+                if ($item['preferensi'] >= 0.85) {
+                    $statusRemisi = 'Remisi Penuh';
+                    $badgeClass = 'badge-success';
+                } elseif ($item['preferensi'] >= 0.75) {
+                    $statusRemisi = 'Remisi Separuh';
+                    $badgeClass = 'badge-warning';
+                } else {
+                    $statusRemisi = 'Tidak Layak Remisi';
+                    $badgeClass = 'badge-danger';
+                }
+            ?>
             <tr>
                 <td class="text-center"><?= $index + 1 ?></td>
                 <td><?= $item['narapidana']['nama_lengkap'] ?? 'Tidak tersedia' ?></td>
@@ -136,6 +151,9 @@
                     <?php else: ?>
                         <span class="badge badge-danger"><?= number_format($item['preferensi'], 4) ?></span>
                     <?php endif; ?>
+                </td>
+                <td class="text-center">
+                    <span class="badge <?= $badgeClass ?>"><?= $statusRemisi ?></span>
                 </td>
             </tr>
             <?php endforeach; ?>

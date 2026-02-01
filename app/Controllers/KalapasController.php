@@ -104,7 +104,7 @@ class KalapasController extends BaseController
         
         $ranking = [];
         if (!empty($penilaian)) {
-            // Hitung ranking sederhana
+            // Hitung ranking menggunakan RATA-RATA SEDERHANA (konsisten dengan halaman lain)
             $ranking = $this->hitungRankingSederhana($narapidana, $kriteria, $penilaian);
         }
         
@@ -194,7 +194,7 @@ class KalapasController extends BaseController
     {
         $periode = $this->request->getGet('periode') ?: date('Y-m');
         
-        // Ambil data untuk perhitungan TOPSIS
+        // Ambil data untuk perhitungan
         $kriteria = $this->penilaianModel->getKriteria();
         $penilaian = $this->penilaianModel->getPenilaianByPeriode($periode);
         
@@ -206,14 +206,8 @@ class KalapasController extends BaseController
         $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
         $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
         
-        // Hitung TOPSIS menggunakan RankingController
-        $rankingController = new \App\Controllers\RankingController();
-        $hasil = $rankingController->hitungTOPSIS($narapidana, $kriteria, $penilaian);
-        
-        // Urutkan ranking
-        usort($hasil, function($a, $b) {
-            return $b['preferensi'] <=> $a['preferensi'];
-        });
+        // Hitung ranking menggunakan RATA-RATA SEDERHANA (konsisten dengan halaman validasi)
+        $hasil = $this->hitungRankingSederhana($narapidana, $kriteria, $penilaian);
         
         $data = [
             'title' => 'Preview Cetak Laporan Ranking',
@@ -237,7 +231,7 @@ class KalapasController extends BaseController
     {
         $periode = $this->request->getGet('periode') ?: date('Y-m');
         
-        // Ambil data untuk perhitungan TOPSIS
+        // Ambil data untuk perhitungan
         $kriteria = $this->penilaianModel->getKriteria();
         $penilaian = $this->penilaianModel->getPenilaianByPeriode($periode);
         
@@ -249,14 +243,8 @@ class KalapasController extends BaseController
         $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
         $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
         
-        // Hitung TOPSIS menggunakan RankingController
-        $rankingController = new \App\Controllers\RankingController();
-        $hasil = $rankingController->hitungTOPSIS($narapidana, $kriteria, $penilaian);
-        
-        // Urutkan ranking
-        usort($hasil, function($a, $b) {
-            return $b['preferensi'] <=> $a['preferensi'];
-        });
+        // Hitung ranking menggunakan RATA-RATA SEDERHANA (konsisten dengan halaman validasi)
+        $hasil = $this->hitungRankingSederhana($narapidana, $kriteria, $penilaian);
         
         $data = [
             'title' => 'Laporan Ranking Narapidana',
@@ -273,37 +261,107 @@ class KalapasController extends BaseController
     private function hitungRankingSederhana($narapidana, $kriteria, $penilaian)
     {
         $hasil = [];
+        $matriks = [];
         
+        // 1. Buat matriks keputusan dan hitung preferensi
         foreach ($narapidana as $napi) {
             $totalNilai = 0;
             $totalBobot = 0;
+            $row = [];
             
+            // Group penilaian untuk narapidana ini
+            $penilaianNapi = array_filter($penilaian, function($p) use ($napi) {
+                return $p['narapidana_id'] == $napi['id'];
+            });
+            
+            // Hitung rata-rata nilai per kriteria dari subkriteria
             foreach ($kriteria as $k) {
-                $nilai = 0;
-                foreach ($penilaian as $p) {
-                    if ($p['narapidana_id'] == $napi['id'] && $p['kriteria_id'] == $k['id']) {
-                        $nilai = (float)$p['nilai'];
-                        break;
+                $nilaiKriteria = 0;
+                $countSubkriteria = 0;
+                
+                // Cari semua penilaian untuk subkriteria dari kriteria ini
+                foreach ($penilaianNapi as $p) {
+                    if (isset($p['subkriteria_id'])) {
+                        $nilaiKriteria += (float)$p['nilai'];
+                        $countSubkriteria++;
                     }
                 }
                 
+                // Hitung rata-rata jika ada subkriteria
+                $nilai = $countSubkriteria > 0 ? $nilaiKriteria / $countSubkriteria : 0;
+                
                 // Normalisasi nilai 0-100 ke 0-1
                 $nilaiNormalized = $nilai / 100;
+                $row[] = $nilaiNormalized;
                 
-                // Kalikan dengan bobot
+                // Kalikan dengan bobot kriteria untuk preferensi
                 $totalNilai += $nilaiNormalized * (float)$k['bobot'];
                 $totalBobot += (float)$k['bobot'];
             }
             
             $preferensi = $totalBobot > 0 ? $totalNilai / $totalBobot : 0;
+            $matriks[] = $row;
             
             $hasil[] = [
                 'narapidana' => $napi,
-                'preferensi' => $preferensi
+                'preferensi' => $preferensi,
+                'row' => $row // Simpan row untuk perhitungan jarak
             ];
         }
         
-        // Urutkan berdasarkan preferensi tertinggi
+        // 2. Hitung jarak D+ dan D- untuk tampilan
+        $jumlahKolom = count($kriteria);
+        
+        if (count($matriks) > 0 && $jumlahKolom > 0) {
+            // Hitung solusi ideal berdasarkan nilai normalisasi
+            $idealPositif = [];
+            $idealNegatif = [];
+            
+            for ($j = 0; $j < $jumlahKolom; $j++) {
+                $kolom = array_column($matriks, $j);
+                $kolomMin = min($kolom);
+                $kolomMax = max($kolom);
+                
+                if ($kriteria[$j]['jenis'] == 'Benefit') {
+                    $idealPositif[$j] = $kolomMax;
+                    $idealNegatif[$j] = $kolomMin;
+                } else { // Cost
+                    $idealPositif[$j] = $kolomMin;
+                    $idealNegatif[$j] = $kolomMax;
+                }
+            }
+            
+            // Hitung jarak untuk setiap alternatif
+            for ($i = 0; $i < count($hasil); $i++) {
+                $dPositif = 0;
+                $dNegatif = 0;
+                
+                for ($j = 0; $j < $jumlahKolom; $j++) {
+                    $diffPositif = $matriks[$i][$j] - $idealPositif[$j];
+                    $diffNegatif = $matriks[$i][$j] - $idealNegatif[$j];
+                    $dPositif += pow($diffPositif, 2);
+                    $dNegatif += pow($diffNegatif, 2);
+                }
+                
+                $dPositif = sqrt($dPositif);
+                $dNegatif = sqrt($dNegatif);
+                
+                // Tambahkan D+ dan D- ke hasil (hanya untuk tampilan)
+                $hasil[$i]['d_positif'] = $dPositif;
+                $hasil[$i]['d_negatif'] = $dNegatif;
+                
+                // Hapus row karena tidak diperlukan lagi
+                unset($hasil[$i]['row']);
+            }
+        } else {
+            // Jika tidak ada data, set D+ dan D- ke 0
+            foreach ($hasil as &$item) {
+                $item['d_positif'] = 0;
+                $item['d_negatif'] = 0;
+            }
+        }
+        
+        // 3. Urutkan berdasarkan preferensi tertinggi
         usort($hasil, function($a, $b) {
             return $b['preferensi'] <=> $a['preferensi'];
         });

@@ -15,20 +15,20 @@
         </a>
     </li>
     <li class="nav-item">
-        <a href="<?= base_url('tpp/kriteria') ?>" class="nav-link">
+        <a href="<?= base_url('tpp/bobot') ?>" class="nav-link">
             <i class="nav-icon fas fa-calculator"></i>
             <p>Input Bobot</p>
         </a>
     </li>
     <li class="nav-item">
-        <a href="<?= base_url('tpp/kriteria') ?>" class="nav-link">
+        <a href="<?= base_url('tpp/bobot/matriks') ?>" class="nav-link">
             <i class="nav-icon fas fa-check-circle"></i>
             <p>Validasi Konsistensi</p>
         </a>
     </li>
     <li class="nav-header">LAPORAN</li>
     <li class="nav-item">
-        <a href="<?= base_url('tpp/kriteria') ?>" class="nav-link">
+        <a href="<?= base_url('tpp/anp') ?>" class="nav-link">
             <i class="nav-icon fas fa-chart-bar"></i>
             <p>Hasil ANP</p>
         </a>
@@ -90,37 +90,10 @@
                             <small class="form-text text-muted">Nama lengkap kriteria penilaian (3-100 karakter)</small>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="bobot">Bobot Kriteria *</label>
-                            <input type="number" step="0.001" min="0" max="1" 
-                                   class="form-control <?= session()->getFlashdata('errors.bobot') ? 'is-invalid' : '' ?>" 
-                                   id="bobot" name="bobot" value="<?= old('bobot', $kriteria['bobot']) ?>" 
-                                   placeholder="Contoh: 0.15, 0.25, etc." required>
-                            <?php if (session()->getFlashdata('errors.bobot')): ?>
-                                <div class="invalid-feedback">
-                                    <?= session()->getFlashdata('errors.bobot') ?>
-                                </div>
-                            <?php endif; ?>
-                            <small class="form-text text-muted">Bobot kriteria antara 0 sampai 1 (contoh: 0.15 untuk 15%)</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="jenis">Jenis Kriteria *</label>
-                            <select class="form-control <?= session()->getFlashdata('errors.jenis') ? 'is-invalid' : '' ?>" 
-                                    id="jenis" name="jenis" required>
-                                <option value="">-- Pilih Jenis --</option>
-                                <option value="Benefit" <?= (old('jenis', $kriteria['jenis']) == 'Benefit') ? 'selected' : '' ?>>Benefit (Semakin tinggi semakin baik)</option>
-                                <option value="Cost" <?= (old('jenis', $kriteria['jenis']) == 'Cost') ? 'selected' : '' ?>>Cost (Semakin rendah semakin baik)</option>
-                            </select>
-                            <?php if (session()->getFlashdata('errors.jenis')): ?>
-                                <div class="invalid-feedback">
-                                    <?= session()->getFlashdata('errors.jenis') ?>
-                                </div>
-                            <?php endif; ?>
-                            <small class="form-text text-muted">
-                                Benefit: Nilai tinggi = baik (contoh: kedisiplinan)<br>
-                                Cost: Nilai rendah = baik (contoh: pelanggaran)
-                            </small>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> <strong>Informasi:</strong> 
+                            Kriteria berfungsi sebagai cluster untuk pengelompokan subkriteria (node). 
+                            Bobot untuk TOPSIS diambil dari bobot global subkriteria hasil perhitungan ANP.
                         </div>
                         
                         <div class="form-group">
@@ -161,14 +134,15 @@
                     <h5><i class="fas fa-exclamation-triangle text-warning"></i> Perhatian</h5>
                     <div class="alert alert-warning">
                         <i class="icon fas fa-exclamation-triangle"></i> 
-                        <strong>Perhatian:</strong> Mengubah bobot kriteria akan mempengaruhi hasil perhitungan ANP dan TOPSIS.
+                        <strong>Perhatian:</strong> Kriteria berfungsi sebagai cluster untuk pengelompokan subkriteria.
+                        Bobot untuk TOPSIS diambil dari bobot global subkriteria hasil ANP.
                     </div>
                     
                     <h5><i class="fas fa-lightbulb text-success"></i> Tips</h5>
                     <ul>
-                        <li>Pastikan total bobot semua kriteria tetap = 1</li>
-                        <li>Periksa konsistensi setelah mengubah bobot</li>
-                        <li>Simpan perubahan secara berkala</li>
+                        <li>Kriteria hanya untuk pengelompokan subkriteria (node)</li>
+                        <li>Semua kriteria memiliki nilai setara</li>
+                        <li>Bobot TOPSIS berasal dari bobot global subkriteria ANP</li>
                     </ul>
                 </div>
             </div>

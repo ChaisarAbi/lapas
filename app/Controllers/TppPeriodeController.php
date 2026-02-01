@@ -17,9 +17,9 @@ class TppPeriodeController extends BaseController
     public function index()
     {
         $data = [
-            'title' => 'Kelola Periode Penilaian',
-            'page_title' => 'Kelola Periode Penilaian',
-            'dashboard_url' => 'tpp/dashboard',
+            'title' => 'Kelola Periode Evaluasi',
+            'page_title' => 'Kelola Periode Evaluasi',
+            'dashboard_url' => 'admin/dashboard',
             'periodes' => $this->periodeModel->getAll(),
             'active_periode' => $this->periodeModel->getAktif()
         ];
@@ -30,9 +30,9 @@ class TppPeriodeController extends BaseController
     public function create()
     {
         $data = [
-            'title' => 'Tambah Periode Penilaian',
-            'page_title' => 'Tambah Periode Penilaian Baru',
-            'dashboard_url' => 'tpp/dashboard'
+            'title' => 'Tambah Periode Evaluasi',
+            'page_title' => 'Tambah Periode Evaluasi Baru',
+            'dashboard_url' => 'admin/dashboard'
         ];
         
         return view('tpp_periode/create', $data);
@@ -66,6 +66,11 @@ class TppPeriodeController extends BaseController
             'keterangan' => $this->request->getPost('keterangan')
         ];
         
+        // Validasi tanggal selesai harus lebih besar dari tanggal mulai
+        if (strtotime($data['tanggal_selesai']) <= strtotime($data['tanggal_mulai'])) {
+            return redirect()->back()->withInput()->with('error', 'Tanggal selesai harus lebih besar dari tanggal mulai.');
+        }
+        
         // Cek apakah sudah ada periode dengan tahun dan bulan yang sama
         $existing = $this->periodeModel->getByTahunBulan($data['tahun'], $data['bulan']);
         if ($existing) {
@@ -78,9 +83,9 @@ class TppPeriodeController extends BaseController
         }
         
         if ($this->periodeModel->insert($data)) {
-            return redirect()->to('/tpp/periode')->with('success', 'Periode penilaian berhasil ditambahkan.');
+            return redirect()->to('/admin/periode')->with('success', 'Periode evaluasi berhasil ditambahkan.');
         } else {
-            return redirect()->back()->withInput()->with('error', 'Gagal menambahkan periode penilaian.');
+            return redirect()->back()->withInput()->with('error', 'Gagal menambahkan periode evaluasi.');
         }
     }
 
@@ -89,13 +94,13 @@ class TppPeriodeController extends BaseController
         $periode = $this->periodeModel->find($id);
         
         if (!$periode) {
-            return redirect()->to('/tpp/periode')->with('error', 'Periode tidak ditemukan.');
+            return redirect()->to('/admin/periode')->with('error', 'Periode tidak ditemukan.');
         }
         
         $data = [
-            'title' => 'Edit Periode Penilaian',
-            'page_title' => 'Edit Periode Penilaian',
-            'dashboard_url' => 'tpp/dashboard',
+            'title' => 'Edit Periode Evaluasi',
+            'page_title' => 'Edit Periode Evaluasi',
+            'dashboard_url' => 'admin/dashboard',
             'periode' => $periode
         ];
         
@@ -107,7 +112,7 @@ class TppPeriodeController extends BaseController
         $periode = $this->periodeModel->find($id);
         
         if (!$periode) {
-            return redirect()->to('/tpp/periode')->with('error', 'Periode tidak ditemukan.');
+            return redirect()->to('/admin/periode')->with('error', 'Periode tidak ditemukan.');
         }
         
         $validation = \Config\Services::validation();
@@ -136,6 +141,11 @@ class TppPeriodeController extends BaseController
             'keterangan' => $this->request->getPost('keterangan')
         ];
         
+        // Validasi tanggal selesai harus lebih besar dari tanggal mulai
+        if (strtotime($data['tanggal_selesai']) <= strtotime($data['tanggal_mulai'])) {
+            return redirect()->back()->withInput()->with('error', 'Tanggal selesai harus lebih besar dari tanggal mulai.');
+        }
+        
         // Cek apakah sudah ada periode dengan tahun dan bulan yang sama (kecuali diri sendiri)
         $existing = $this->periodeModel->getByTahunBulan($data['tahun'], $data['bulan']);
         if ($existing && $existing['id'] != $id) {
@@ -148,9 +158,9 @@ class TppPeriodeController extends BaseController
         }
         
         if ($this->periodeModel->update($id, $data)) {
-            return redirect()->to('/tpp/periode')->with('success', 'Periode penilaian berhasil diperbarui.');
+            return redirect()->to('/admin/periode')->with('success', 'Periode evaluasi berhasil diperbarui.');
         } else {
-            return redirect()->back()->withInput()->with('error', 'Gagal memperbarui periode penilaian.');
+            return redirect()->back()->withInput()->with('error', 'Gagal memperbarui periode evaluasi.');
         }
     }
 
@@ -159,18 +169,18 @@ class TppPeriodeController extends BaseController
         $periode = $this->periodeModel->find($id);
         
         if (!$periode) {
-            return redirect()->to('/tpp/periode')->with('error', 'Periode tidak ditemukan.');
+            return redirect()->to('/admin/periode')->with('error', 'Periode tidak ditemukan.');
         }
         
         // Cek apakah periode sedang aktif
         if ($periode['status'] == 'aktif') {
-            return redirect()->to('/tpp/periode')->with('error', 'Tidak dapat menghapus periode yang sedang aktif.');
+            return redirect()->to('/admin/periode')->with('error', 'Tidak dapat menghapus periode yang sedang aktif.');
         }
         
         if ($this->periodeModel->delete($id)) {
-            return redirect()->to('/tpp/periode')->with('success', 'Periode penilaian berhasil dihapus.');
+            return redirect()->to('/admin/periode')->with('success', 'Periode evaluasi berhasil dihapus.');
         } else {
-            return redirect()->to('/tpp/periode')->with('error', 'Gagal menghapus periode penilaian.');
+            return redirect()->to('/admin/periode')->with('error', 'Gagal menghapus periode evaluasi.');
         }
     }
 
@@ -179,7 +189,7 @@ class TppPeriodeController extends BaseController
         $periode = $this->periodeModel->find($id);
         
         if (!$periode) {
-            return redirect()->to('/tpp/periode')->with('error', 'Periode tidak ditemukan.');
+            return redirect()->to('/admin/periode')->with('error', 'Periode tidak ditemukan.');
         }
         
         // Nonaktifkan semua periode
@@ -189,9 +199,9 @@ class TppPeriodeController extends BaseController
         $data = ['status' => 'aktif'];
         
         if ($this->periodeModel->update($id, $data)) {
-            return redirect()->to('/tpp/periode')->with('success', 'Periode berhasil diaktifkan.');
+            return redirect()->to('/admin/periode')->with('success', 'Periode berhasil diaktifkan.');
         } else {
-            return redirect()->to('/tpp/periode')->with('error', 'Gagal mengaktifkan periode.');
+            return redirect()->to('/admin/periode')->with('error', 'Gagal mengaktifkan periode.');
         }
     }
 }

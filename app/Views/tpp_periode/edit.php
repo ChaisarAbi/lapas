@@ -6,8 +6,8 @@ $activeMenu = 'periode';
 ?>
 
 <?= $this->section('breadcrumb') ?>
-    <li class="breadcrumb-item"><a href="<?= base_url('tpp/dashboard') ?>">Dashboard</a></li>
-    <li class="breadcrumb-item"><a href="<?= base_url('tpp/periode') ?>">Kelola Periode</a></li>
+    <li class="breadcrumb-item"><a href="<?= base_url('admin/dashboard') ?>">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="<?= base_url('admin/periode') ?>">Kelola Periode</a></li>
     <li class="breadcrumb-item active">Edit Periode</li>
 <?= $this->endSection() ?>
 
@@ -38,7 +38,7 @@ $activeMenu = 'periode';
                         </div>
                     <?php endif; ?>
                     
-                    <form method="post" action="<?= base_url('tpp/periode/update/' . $periode['id']) ?>">
+                    <form method="post" action="<?= base_url('admin/periode/update/' . $periode['id']) ?>">
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
@@ -119,7 +119,7 @@ $activeMenu = 'periode';
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save"></i> Update Periode
                                     </button>
-                                    <a href="<?= base_url('tpp/periode') ?>" class="btn btn-secondary">
+                                    <a href="<?= base_url('admin/periode') ?>" class="btn btn-secondary">
                                         <i class="fas fa-arrow-left"></i> Kembali
                                     </a>
                                 </div>

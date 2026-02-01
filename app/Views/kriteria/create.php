@@ -90,23 +90,10 @@
                             <small class="form-text text-muted">Nama lengkap kriteria penilaian (3-100 karakter)</small>
                         </div>
                         
-                        <div class="form-group">
-                            <label for="jenis">Jenis Kriteria *</label>
-                            <select class="form-control <?= session()->getFlashdata('errors.jenis') ? 'is-invalid' : '' ?>" 
-                                    id="jenis" name="jenis" required>
-                                <option value="">-- Pilih Jenis --</option>
-                                <option value="Benefit" <?= old('jenis') == 'Benefit' ? 'selected' : '' ?>>Benefit (Semakin tinggi semakin baik)</option>
-                                <option value="Cost" <?= old('jenis') == 'Cost' ? 'selected' : '' ?>>Cost (Semakin rendah semakin baik)</option>
-                            </select>
-                            <?php if (session()->getFlashdata('errors.jenis')): ?>
-                                <div class="invalid-feedback">
-                                    <?= session()->getFlashdata('errors.jenis') ?>
-                                </div>
-                            <?php endif; ?>
-                            <small class="form-text text-muted">
-                                Benefit: Nilai tinggi = baik (contoh: kedisiplinan)<br>
-                                Cost: Nilai rendah = baik (contoh: pelanggaran)
-                            </small>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> <strong>Informasi:</strong> 
+                            Kriteria berfungsi sebagai cluster untuk pengelompokan subkriteria (node). 
+                            Bobot untuk TOPSIS diambil dari bobot global subkriteria hasil perhitungan ANP.
                         </div>
                         
                         <div class="form-group">
@@ -131,15 +118,11 @@
                     <h5><i class="fas fa-info-circle text-info"></i> Tentang Kriteria</h5>
                     <p>Kriteria adalah faktor-faktor yang digunakan untuk menilai narapidana dalam program pembinaan.</p>
                     
-                    <h5><i class="fas fa-balance-scale text-success"></i> Jenis Kriteria</h5>
-                    <ul>
-                        <li><strong>Benefit</strong>: Semakin tinggi nilai semakin baik</li>
-                        <li><strong>Cost</strong>: Semakin rendah nilai semakin baik</li>
-                    </ul>
-                    
                     <h5><i class="fas fa-lightbulb text-warning"></i> Catatan Penting</h5>
                     <ul>
-                        <li>Bobot kriteria diatur di menu <strong>Input Bobot</strong></li>
+                        <li>Kriteria berfungsi sebagai <strong>cluster</strong> untuk pengelompokan subkriteria (node)</li>
+                        <li>Semua kriteria memiliki nilai setara (tidak ada bobot khusus)</li>
+                        <li>Bobot untuk TOPSIS diambil dari <strong>bobot global subkriteria</strong> hasil ANP</li>
                         <li>Subkriteria dapat ditambahkan setelah kriteria dibuat</li>
                         <li>Pastikan kode kriteria unik dan tidak duplikat</li>
                     </ul>

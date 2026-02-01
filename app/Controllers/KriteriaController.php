@@ -43,8 +43,7 @@ class KriteriaController extends BaseController
         
         $validation->setRules([
             'kode' => 'required|min_length[2]|max_length[10]|is_unique[kriteria.kode]',
-            'nama' => 'required|min_length[3]|max_length[100]',
-            'jenis' => 'required|in_list[Benefit,Cost]'
+            'nama' => 'required|min_length[3]|max_length[100]'
         ], [
             'kode' => [
                 'required' => 'Kode kriteria harus diisi',
@@ -56,10 +55,6 @@ class KriteriaController extends BaseController
                 'required' => 'Nama kriteria harus diisi',
                 'min_length' => 'Nama minimal 3 karakter',
                 'max_length' => 'Nama maksimal 100 karakter'
-            ],
-            'jenis' => [
-                'required' => 'Jenis kriteria harus dipilih',
-                'in_list' => 'Jenis kriteria tidak valid'
             ]
         ]);
         
@@ -69,9 +64,9 @@ class KriteriaController extends BaseController
         
         $data = [
             'kode' => $this->request->getPost('kode'),
-            'nama' => $this->request->getPost('nama'),
-            'bobot' => 0, // Default bobot 0, nanti diatur di menu Input Bobot
-            'jenis' => $this->request->getPost('jenis')
+            'nama' => $this->request->getPost('nama')
+            // Bobot dan jenis dihapus sesuai permintaan user
+            // Kriteria hanya untuk pengelompokan subkriteria (cluster)
         ];
         
         if ($this->kriteriaModel->save($data)) {
@@ -109,24 +104,21 @@ class KriteriaController extends BaseController
         
         $validation = \Config\Services::validation();
         
+        // Gunakan validation rule is_unique dengan pengecualian untuk id ini
         $validation->setRules([
-            'kode' => 'required|min_length[2]|max_length[10]',
-            'nama' => 'required|min_length[3]|max_length[100]',
-            'jenis' => 'required|in_list[Benefit,Cost]'
+            'kode' => "required|min_length[2]|max_length[10]|is_unique[kriteria.kode,id,{$id}]",
+            'nama' => 'required|min_length[3]|max_length[100]'
         ], [
             'kode' => [
                 'required' => 'Kode kriteria harus diisi',
                 'min_length' => 'Kode minimal 2 karakter',
-                'max_length' => 'Kode maksimal 10 karakter'
+                'max_length' => 'Kode maksimal 10 karakter',
+                'is_unique' => 'Kode kriteria sudah digunakan oleh kriteria lain'
             ],
             'nama' => [
                 'required' => 'Nama kriteria harus diisi',
                 'min_length' => 'Nama minimal 3 karakter',
                 'max_length' => 'Nama maksimal 100 karakter'
-            ],
-            'jenis' => [
-                'required' => 'Jenis kriteria harus dipilih',
-                'in_list' => 'Jenis kriteria tidak valid'
             ]
         ]);
         
@@ -134,27 +126,13 @@ class KriteriaController extends BaseController
             return redirect()->back()->withInput()->with('errors', $validation->getErrors());
         }
         
-        // Validasi manual untuk kode unik (kecuali untuk kriteria ini)
-        $kode = $this->request->getPost('kode');
-        if ($kode !== $kriteria['kode']) {
-            $existingKriteria = $this->kriteriaModel->where('kode', $kode)->first();
-            if ($existingKriteria) {
-                return redirect()->back()->withInput()->with('error', 'Kode kriteria sudah digunakan oleh kriteria lain');
-            }
-        }
-        
         $data = [
             'id' => $id,
-            'kode' => $kode,
-            'nama' => $this->request->getPost('nama'),
-            'jenis' => $this->request->getPost('jenis')
+            'kode' => $this->request->getPost('kode'),
+            'nama' => $this->request->getPost('nama')
+            // Jenis tetap Benefit, semua kriteria setara
+            // Bobot diambil dari bobot global subkriteria ANP
         ];
-        
-        // Hanya update bobot jika ada input (bobot diatur di menu Input Bobot)
-        $bobotInput = $this->request->getPost('bobot');
-        if ($bobotInput !== null && $bobotInput !== '') {
-            $data['bobot'] = $bobotInput;
-        }
         
         if ($this->kriteriaModel->save($data)) {
             return redirect()->to('/tpp/kriteria')->with('success', 'Kriteria berhasil diperbarui');

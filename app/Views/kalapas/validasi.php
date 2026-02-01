@@ -53,11 +53,12 @@ $activeMenu = 'validasi';
                                     <thead>
                                         <tr>
                                             <th width="5%">Rank</th>
-                                            <th width="20%">Narapidana</th>
-                                            <th width="15%">Nomor Registrasi</th>
+                                            <th width="15%">Narapidana</th>
+                                            <th width="10%">Nomor Registrasi</th>
                                             <th width="15%">Jenis Kejahatan</th>
-                                            <th width="15%">Nilai Preferensi</th>
-                                            <th width="15%">Status</th>
+                                            <th width="10%">Nilai Preferensi</th>
+                                            <th width="10%">Status</th>
+                                            <th width="15%">Status Remisi</th>
                                             <th width="15%">Validasi</th>
                                         </tr>
                                     </thead>
@@ -85,6 +86,25 @@ $activeMenu = 'validasi';
                                                 <?php else: ?>
                                                     <span class="badge badge-danger">Perlu Perhatian</span>
                                                 <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php
+                                                // Tentukan status remisi berdasarkan nilai preferensi (Ci)
+                                                // Kriteria baru: ≥0.85 Remisi Penuh, ≥0.75 Remisi Separuh, <0.75 Tidak Layak Remisi
+                                                $statusRemisi = '';
+                                                $badgeClass = '';
+                                                if ($item['preferensi'] >= 0.85) {
+                                                    $statusRemisi = 'Remisi Penuh';
+                                                    $badgeClass = 'badge-success';
+                                                } elseif ($item['preferensi'] >= 0.75) {
+                                                    $statusRemisi = 'Remisi Separuh';
+                                                    $badgeClass = 'badge-warning';
+                                                } else {
+                                                    $statusRemisi = 'Tidak Layak Remisi';
+                                                    $badgeClass = 'badge-danger';
+                                                }
+                                                ?>
+                                                <span class="badge <?= $badgeClass ?>"><?= $statusRemisi ?></span>
                                             </td>
                                             <td>
                                                 <select name="validasi[<?= $item['narapidana']['id'] ?>]" class="form-control form-control-sm">

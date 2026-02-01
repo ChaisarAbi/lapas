@@ -29,10 +29,10 @@ class KriteriaModel extends Model
 
     // Validation
     protected $validationRules = [
-        'kode' => 'required|min_length[2]|max_length[10]',
-        'nama' => 'required|min_length[3]|max_length[100]',
-        'jenis' => 'required|in_list[Benefit,Cost]',
-        'bobot' => 'permit_empty|decimal|greater_than_equal_to[0]|less_than_equal_to[1]'
+        'kode' => 'required|min_length[2]|max_length[10]|is_unique[kriteria.kode,id,{id}]',
+        'nama' => 'required|min_length[3]|max_length[100]'
+        // Bobot dan jenis dihapus sesuai permintaan user
+        // Kriteria hanya untuk pengelompokan subkriteria (cluster)
     ];
     
     protected $validationMessages = [

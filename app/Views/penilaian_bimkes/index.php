@@ -81,34 +81,118 @@ $activeMenu = 'penilaian';
                         
                         <div class="row mt-4">
                             <div class="col-12">
-                                <h4>Nilai Kriteria</h4>
-                                <p class="text-muted">Masukkan nilai untuk setiap kriteria (skala 0-100)</p>
+                                <h4>Nilai Subkriteria</h4>
+                                <p class="text-muted">Masukkan nilai untuk setiap subkriteria (skala 0-100)</p>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Sistem sekarang menggunakan subkriteria untuk perhitungan yang lebih akurat.
+                                    Setiap kriteria memiliki beberapa subkriteria dengan bobot berbeda.
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="row">
-                            <?php foreach ($kriteria as $index => $k): ?>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="nilai_<?= $k['id'] ?>">
-                                        <?= $k['kode'] ?> - <?= $k['nama'] ?>
-                                        <span class="badge badge-<?= $k['jenis'] == 'Benefit' ? 'success' : 'danger' ?>">
-                                            <?= $k['jenis'] ?>
-                                        </span>
-                                    </label>
-                                    <input type="number" 
-                                           name="nilai_<?= $k['id'] ?>" 
-                                           id="nilai_<?= $k['id'] ?>" 
-                                           class="form-control" 
-                                           min="0" 
-                                           max="100" 
-                                           step="0.01"
-                                           placeholder="Masukkan nilai 0-100">
-                                    <small class="text-muted">Bobot: <?= number_format($k['bobot'], 3) ?></small>
+                        <?php 
+                        // Group subkriteria by kriteria untuk tampilan yang lebih terorganisir
+                        $subkriteria_by_kriteria = [];
+                        foreach ($subkriteria as $sub) {
+                            $kriteria_id = $sub['kriteria_id'];
+                            if (!isset($subkriteria_by_kriteria[$kriteria_id])) {
+                                $subkriteria_by_kriteria[$kriteria_id] = [];
+                            }
+                            $subkriteria_by_kriteria[$kriteria_id][] = $sub;
+                        }
+                        ?>
+                        
+                        <?php foreach ($subkriteria_by_kriteria as $kriteria_id => $subs): 
+                            $kriteria_info = null;
+                            foreach ($kriteria as $k) {
+                                if ($k['id'] == $kriteria_id) {
+                                    $kriteria_info = $k;
+                                    break;
+                                }
+                            }
+                        ?>
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">
+                                    <?= $kriteria_info ? $kriteria_info['kode'] . ' - ' . $kriteria_info['nama'] : 'Kriteria ' . $kriteria_id ?>
+                                    <span class="badge badge-<?= $kriteria_info && $kriteria_info['jenis'] == 'Benefit' ? 'success' : 'danger' ?>">
+                                        <?= $kriteria_info ? $kriteria_info['jenis'] : 'Benefit' ?>
+                                    </span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <?php foreach ($subs as $sub): 
+                                        $skala_info = '';
+                                        if ($sub['jenis'] == 'Benefit') {
+                                            $skala_info = 'Skala: 0-20=1, 21-40=2, 41-60=3, 61-80=4, 81-100=5';
+                                        } elseif ($sub['jenis'] == 'Cost') {
+                                            $skala_info = 'Skala: 0-33=1, 34-66=2, 67-100=3';
+                                        }
+                                    ?>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="nilai_<?= $sub['id'] ?>">
+                                                <?= $sub['kode'] ?> - <?= $sub['nama'] ?>
+                                                <span class="badge badge-<?= $sub['jenis'] == 'Benefit' ? 'success' : 'danger' ?>">
+                                                    <?= $sub['jenis'] ?>
+                                                </span>
+                                            </label>
+                                            <input type="number" 
+                                                   name="nilai_<?= $sub['id'] ?>" 
+                                                   id="nilai_<?= $sub['id'] ?>" 
+                                                   class="form-control nilai-input" 
+                                                   data-jenis="<?= $sub['jenis'] ?>"
+                                                   min="0" 
+                                                   max="100" 
+                                                   step="0.01"
+                                                   placeholder="Masukkan nilai 0-100"
+                                                   oninput="updateSkalaInfo(this)">
+                                            <div class="skala-info" id="skala_info_<?= $sub['id'] ?>" style="font-size: 0.85rem; margin-top: 5px;">
+                                                <small class="text-muted"><?= $skala_info ?></small><br>
+                                                <small class="text-info">Nilai konversi: <span id="konversi_<?= $sub['id'] ?>">-</span></small>
+                                            </div>
+                                            <small class="text-muted">Bobot: <?= number_format($sub['bobot'], 3) ?></small>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
-                            <?php endforeach; ?>
                         </div>
+                        <?php endforeach; ?>
+                        
+                        <script>
+                        function updateSkalaInfo(input) {
+                            const nilai = parseFloat(input.value) || 0;
+                            const jenis = input.getAttribute('data-jenis');
+                            const id = input.id.replace('nilai_', '');
+                            const konversiSpan = document.getElementById('konversi_' + id);
+                            
+                            let konversi = 0;
+                            if (jenis === 'Benefit') {
+                                if (nilai >= 0 && nilai <= 20) konversi = 1;
+                                else if (nilai >= 21 && nilai <= 40) konversi = 2;
+                                else if (nilai >= 41 && nilai <= 60) konversi = 3;
+                                else if (nilai >= 61 && nilai <= 80) konversi = 4;
+                                else if (nilai >= 81 && nilai <= 100) konversi = 5;
+                            } else if (jenis === 'Cost') {
+                                if (nilai >= 0 && nilai <= 33) konversi = 1;
+                                else if (nilai >= 34 && nilai <= 66) konversi = 2;
+                                else if (nilai >= 67 && nilai <= 100) konversi = 3;
+                            }
+                            
+                            konversiSpan.textContent = konversi > 0 ? konversi : '-';
+                        }
+                        
+                        // Initialize skala info for all inputs
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const inputs = document.querySelectorAll('.nilai-input');
+                            inputs.forEach(input => {
+                                updateSkalaInfo(input);
+                            });
+                        });
+                        </script>
                         
                         <div class="row mt-4">
                             <div class="col-12">

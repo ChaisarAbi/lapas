@@ -81,6 +81,18 @@
         .page-break {
             page-break-before: always;
         }
+        .status-legend {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        .status-item {
+            display: inline-block;
+            margin-right: 15px;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -111,35 +123,49 @@
         </table>
     </div>
     
+    <!-- Status Legend -->
+    <div class="status-legend">
+        <strong>Legenda Status Remisi:</strong>
+        <div class="status-item">
+            <span class="badge badge-success">Remisi Penuh</span> - 30% terbaik
+        </div>
+        <div class="status-item">
+            <span class="badge badge-warning">Remisi Separuh</span> - 30% berikutnya
+        </div>
+        <div class="status-item">
+            <span class="badge badge-danger">Tidak Layak</span> - 40% terbawah
+        </div>
+    </div>
+    
     <table class="table">
         <thead>
             <tr>
                 <th width="5%">Rank</th>
-                <th width="25%">Nama Narapidana</th>
-                <th width="15%">Nomor Registrasi</th>
-                <th width="20%">Kasus</th>
-                <th width="15%">Jarak Positif (D+)</th>
-                <th width="15%">Jarak Negatif (D-)</th>
-                <th width="15%">Nilai Preferensi</th>
+                <th width="20%">Narapidana</th>
+                <th width="10%">Kode</th>
+                <th width="15%">Nilai S</th>
+                <th width="15%">Nilai R</th>
+                <th width="15%">Nilai Q</th>
+                <th width="20%">Status</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($ranking as $index => $item): ?>
+            <?php foreach ($ranking as $index => $row): ?>
             <tr>
                 <td class="text-center"><?= $index + 1 ?></td>
-                <td><?= $item['narapidana']['nama_lengkap'] ?></td>
-                <td><?= $item['narapidana']['nomor_registrasi'] ?></td>
-                <td><?= $item['narapidana']['jenis_kejahatan'] ?? '-' ?></td>
-                <td class="text-center"><?= number_format($item['d_positif'], 4) ?></td>
-                <td class="text-center"><?= number_format($item['d_negatif'], 4) ?></td>
+                <td>
+                    <strong><?= $row['nama'] ?></strong><br>
+                    <small class="text-muted">NIP: <?= $row['nip'] ?></small>
+                </td>
+                <td class="text-center"><?= $row['kode'] ?></td>
+                <td class="text-center"><?= number_format($row['nilai_s'], 4) ?></td>
+                <td class="text-center"><?= number_format($row['nilai_r'], 4) ?></td>
+                <td class="text-center"><?= number_format($row['nilai_q'], 4) ?></td>
                 <td class="text-center">
-                    <?php if ($item['preferensi'] >= 0.7): ?>
-                        <span class="badge badge-success"><?= number_format($item['preferensi'], 4) ?></span>
-                    <?php elseif ($item['preferensi'] >= 0.5): ?>
-                        <span class="badge badge-warning"><?= number_format($item['preferensi'], 4) ?></span>
-                    <?php else: ?>
-                        <span class="badge badge-danger"><?= number_format($item['preferensi'], 4) ?></span>
-                    <?php endif; ?>
+                    <span class="badge <?= $row['status_class'] ?>">
+                        <i class="fas fa-star<?= $row['status'] == 'remisi_separuh' ? '-half-alt' : '' ?>"></i>
+                        <?= $row['status_text'] ?>
+                    </span>
                 </td>
             </tr>
             <?php endforeach; ?>

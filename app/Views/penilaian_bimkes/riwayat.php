@@ -178,11 +178,12 @@ $activeMenu = 'penilaian';
                                                             </td>
                                                             <td>
                                                                 <a href="<?= base_url('bimkesmaswat/penilaian/riwayat?narapidana_id=' . $item['narapidana_id'] . ($selected_periode ? '&periode=' . $selected_periode : '')) ?>" class="btn btn-info btn-sm">
-                                                                    <i class="fas fa-eye"></i> Lihat Riwayat
+                                                                    <i class="fas fa-eye"></i> Riwayat
                                                                 </a>
                                                                 <a href="<?= base_url('bimkesmaswat/penilaian?narapidana_id=' . $item['narapidana_id']) ?>" class="btn btn-success btn-sm">
-                                                                    <i class="fas fa-plus"></i> Input Nilai
+                                                                    <i class="fas fa-plus"></i> Input
                                                                 </a>
+                                
                                                             </td>
                                                         </tr>
                                                         <?php endforeach; ?>

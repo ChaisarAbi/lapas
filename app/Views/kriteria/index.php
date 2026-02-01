@@ -44,8 +44,6 @@ $activeMenu = 'kriteria';
                                     <th width="5%">No</th>
                                     <th width="10%">Kode</th>
                                     <th width="30%">Nama Kriteria</th>
-                                    <th width="10%">Bobot</th>
-                                    <th width="15%">Jenis</th>
                                     <th width="20%">Dibuat</th>
                                     <th width="10%">Aksi</th>
                                 </tr>
@@ -57,12 +55,6 @@ $activeMenu = 'kriteria';
                                         <td><?= $index + 1 ?></td>
                                         <td><span class="badge badge-info"><?= $item['kode'] ?></span></td>
                                         <td><?= $item['nama'] ?></td>
-                                        <td><?= number_format($item['bobot'], 3) ?></td>
-                                        <td>
-                                            <span class="badge badge-<?= $item['jenis'] == 'Benefit' ? 'success' : 'danger' ?>">
-                                                <?= $item['jenis'] ?>
-                                            </span>
-                                        </td>
                                         <td><?= date('d/m/Y', strtotime($item['created_at'])) ?></td>
                                         <td>
                                             <a href="<?= base_url('tpp/kriteria/edit/' . $item['id']) ?>" class="btn btn-warning btn-sm">
@@ -76,7 +68,7 @@ $activeMenu = 'kriteria';
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="7" class="text-center">Tidak ada data kriteria</td>
+                                        <td colspan="5" class="text-center">Tidak ada data kriteria</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -87,28 +79,12 @@ $activeMenu = 'kriteria';
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h3 class="card-title">Total Bobot</h3>
+                                    <h3 class="card-title">Informasi Kriteria</h3>
                                 </div>
                                 <div class="card-body">
-                                    <?php
-                                    $totalBobot = 0;
-                                    if (!empty($kriteria)) {
-                                        foreach ($kriteria as $item) {
-                                            $totalBobot += $item['bobot'];
-                                        }
-                                    }
-                                    ?>
-                                    <h2 class="text-center <?= $totalBobot == 1 ? 'text-success' : ($totalBobot > 1 ? 'text-danger' : 'text-warning') ?>">
-                                        <?= number_format($totalBobot, 3) ?>
-                                    </h2>
-                                    <p class="text-center">
-                                        <?php if ($totalBobot == 1): ?>
-                                            <span class="badge badge-success">Bobot sudah normal (total = 1)</span>
-                                        <?php elseif ($totalBobot > 1): ?>
-                                            <span class="badge badge-danger">Bobot melebihi 1</span>
-                                        <?php else: ?>
-                                            <span class="badge badge-warning">Bobot kurang dari 1</span>
-                                        <?php endif; ?>
+                                    <p>Total Kriteria: <span class="badge badge-info"><?= count($kriteria) ?> kriteria</span></p>
+                                    <p class="text-muted">
+                                        <i class="fas fa-info-circle"></i> Kriteria berfungsi sebagai cluster untuk pengelompokan subkriteria (node).
                                     </p>
                                 </div>
                             </div>
@@ -116,25 +92,15 @@ $activeMenu = 'kriteria';
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h3 class="card-title">Distribusi Kriteria</h3>
+                                    <h3 class="card-title">Catatan Penting</h3>
                                 </div>
                                 <div class="card-body">
-                                    <?php
-                                    $benefitCount = 0;
-                                    $costCount = 0;
-                                    if (!empty($kriteria)) {
-                                        foreach ($kriteria as $item) {
-                                            if ($item['jenis'] == 'Benefit') {
-                                                $benefitCount++;
-                                            } else {
-                                                $costCount++;
-                                            }
-                                        }
-                                    }
-                                    ?>
-                                    <p>Benefit: <span class="badge badge-success"><?= $benefitCount ?> kriteria</span></p>
-                                    <p>Cost: <span class="badge badge-danger"><?= $costCount ?> kriteria</span></p>
-                                    <p>Total: <span class="badge badge-info"><?= count($kriteria) ?> kriteria</span></p>
+                                    <ul>
+                                        <li>Kriteria hanya untuk pengelompokan subkriteria (node)</li>
+                                        <li>Semua kriteria memiliki nilai setara</li>
+                                        <li>Bobot untuk TOPSIS diambil dari bobot global subkriteria hasil ANP</li>
+                                        <li>Subkriteria dapat ditambahkan setelah kriteria dibuat</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
@@ -142,7 +108,7 @@ $activeMenu = 'kriteria';
                 </div>
                 <div class="card-footer">
                     <p class="text-muted">
-                        <i class="fas fa-info-circle"></i> Total bobot semua kriteria harus sama dengan 1 untuk perhitungan ANP yang valid.
+                        <i class="fas fa-info-circle"></i> Gunakan fitur ini untuk mengelola kriteria penilaian dalam sistem ANP.
                     </p>
                 </div>
             </div>

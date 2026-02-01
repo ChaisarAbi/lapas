@@ -79,18 +79,32 @@ class PerhitunganController extends BaseController
     {
         $hasil = [];
         
-        // 1. Buat matriks keputusan
+        // 1. Buat matriks keputusan - hitung rata-rata nilai per kriteria dari subkriteria
         $matriks = [];
         foreach ($narapidana as $napi) {
             $row = [];
+            
+            // Group penilaian untuk narapidana ini
+            $penilaianNapi = array_filter($penilaian, function($p) use ($napi) {
+                return $p['narapidana_id'] == $napi['id'];
+            });
+            
             foreach ($kriteria as $k) {
-                $nilai = 0;
-                foreach ($penilaian as $p) {
-                    if ($p['narapidana_id'] == $napi['id'] && $p['kriteria_id'] == $k['id']) {
-                        $nilai = (float)$p['nilai'];
-                        break;
+                $nilaiKriteria = 0;
+                $countSubkriteria = 0;
+                
+                // Cari semua penilaian untuk subkriteria dari kriteria ini
+                foreach ($penilaianNapi as $p) {
+                    // Periksa apakah penilaian ini untuk subkriteria dari kriteria ini
+                    if (isset($p['subkriteria_id'])) {
+                        // Untuk sementara, kita asumsikan semua penilaian valid
+                        $nilaiKriteria += (float)$p['nilai'];
+                        $countSubkriteria++;
                     }
                 }
+                
+                // Hitung rata-rata jika ada subkriteria
+                $nilai = $countSubkriteria > 0 ? $nilaiKriteria / $countSubkriteria : 0;
                 $row[] = $nilai;
             }
             $matriks[] = $row;

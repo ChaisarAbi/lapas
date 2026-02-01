@@ -4,13 +4,16 @@ namespace App\Controllers;
 
 use App\Models\NarapidanaModel;
 use App\Models\KriteriaModel;
+use App\Models\SubkriteriaModel;
 use App\Models\PenilaianModel;
 use App\Models\PeriodeModel;
+use App\Models\TopsisModel;
 
 class PenilaianBimkesController extends BaseController
 {
     protected $narapidanaModel;
     protected $kriteriaModel;
+    protected $subkriteriaModel;
     protected $penilaianModel;
     protected $periodeModel;
     
@@ -18,6 +21,7 @@ class PenilaianBimkesController extends BaseController
     {
         $this->narapidanaModel = new NarapidanaModel();
         $this->kriteriaModel = new KriteriaModel();
+        $this->subkriteriaModel = new SubkriteriaModel();
         $this->penilaianModel = new PenilaianModel();
         $this->periodeModel = new PeriodeModel();
         helper(['form', 'url']);
@@ -35,12 +39,16 @@ class PenilaianBimkesController extends BaseController
         
         $periode = $this->request->getGet('periode') ?: $defaultPeriode;
         
+        // Ambil data subkriteria dengan join ke kriteria untuk mendapatkan jenis
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        
         $data = [
             'title' => 'Input Nilai Penilaian',
             'page_title' => 'Input Nilai Penilaian Narapidana',
             'dashboard_url' => 'bimkesmaswat/dashboard',
             'narapidana' => $this->narapidanaModel->getAktif(),
-            'kriteria' => $this->kriteriaModel->getOrdered(),
+            'kriteria' => $this->kriteriaModel->getOrdered(), // Masih diperlukan untuk grouping
+            'subkriteria' => $subkriteria,
             'periode' => $periode,
             'periode_list' => $this->penilaianModel->getPeriodeForDropdown(),
             'periode_aktif' => $periodeAktif
@@ -55,7 +63,7 @@ class PenilaianBimkesController extends BaseController
         
         $validation->setRules([
             'narapidana_id' => 'required|integer',
-            'periode' => 'required|min_length[6]|max_length[20]'
+            'periode' => 'required|min_length[4]|max_length[20]'
         ]);
         
         if (!$validation->withRequest($this->request)->run()) {
@@ -66,20 +74,20 @@ class PenilaianBimkesController extends BaseController
         $periode = $this->request->getPost('periode');
         $penilai_id = session()->get('user_id');
         
-        // Ambil semua kriteria
-        $kriteria = $this->kriteriaModel->findAll();
+        // Ambil semua subkriteria
+        $subkriteria = $this->subkriteriaModel->findAll();
         
         $successCount = 0;
         $errorMessages = [];
         
-        foreach ($kriteria as $k) {
-            $fieldName = 'nilai_' . $k['id'];
+        foreach ($subkriteria as $sub) {
+            $fieldName = 'nilai_' . $sub['id'];
             $nilai = $this->request->getPost($fieldName);
             
             if ($nilai !== null) {
                 $data = [
                     'narapidana_id' => $narapidana_id,
-                    'kriteria_id' => $k['id'],
+                    'subkriteria_id' => $sub['id'],
                     'nilai' => $nilai,
                     'periode' => $periode,
                     'penilai_id' => $penilai_id
@@ -88,13 +96,13 @@ class PenilaianBimkesController extends BaseController
                 if ($this->penilaianModel->savePenilaian($data)) {
                     $successCount++;
                 } else {
-                    $errorMessages[] = "Gagal menyimpan nilai untuk kriteria {$k['kode']}";
+                    $errorMessages[] = "Gagal menyimpan nilai untuk subkriteria {$sub['kode']}";
                 }
             }
         }
         
         if ($successCount > 0) {
-            $message = "Berhasil menyimpan {$successCount} nilai penilaian";
+            $message = "Berhasil menyimpan {$successCount} nilai penilaian untuk subkriteria";
             if (!empty($errorMessages)) {
                 $message .= '. ' . implode(', ', $errorMessages);
             }
@@ -136,6 +144,8 @@ class PenilaianBimkesController extends BaseController
         return view('penilaian_bimkes/riwayat', $data);
     }
     
+    
+    
     public function edit($id)
     {
         $penilaian = $this->penilaianModel->find($id);
@@ -149,17 +159,22 @@ class PenilaianBimkesController extends BaseController
             return redirect()->to('/bimkesmaswat/penilaian/riwayat')->with('error', 'Anda tidak memiliki akses untuk mengedit penilaian ini');
         }
         
+        // Ambil data subkriteria untuk penilaian ini
+        $subkriteria = $this->subkriteriaModel->find($penilaian['subkriteria_id']);
+        
         $data = [
             'title' => 'Edit Nilai Penilaian',
             'page_title' => 'Edit Nilai Penilaian',
             'dashboard_url' => 'bimkesmaswat/dashboard',
             'penilaian' => $penilaian,
-            'kriteria' => $this->kriteriaModel->find($penilaian['kriteria_id']),
+            'subkriteria' => $subkriteria,
             'narapidana' => $this->narapidanaModel->find($penilaian['narapidana_id'])
         ];
         
         return view('penilaian_bimkes/edit', $data);
     }
+    
+    
     
     public function update($id)
     {

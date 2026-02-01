@@ -39,9 +39,11 @@ class TppController extends BaseController
         $kriteriaDenganBobot = $this->kriteriaModel->where('bobot >', 0)->countAllResults();
         $persentaseBobot = $totalKriteria > 0 ? round(($kriteriaDenganBobot / $totalKriteria) * 100, 1) : 0;
         
-        // Untuk dashboard ANP, kita gunakan persentase bobot sebagai placeholder
-        // (Dalam implementasi lengkap, hitung persentase interdependensi dari tabel anp_interdependensi)
-        $persentaseInterdependensi = $persentaseBobot; // Placeholder
+        // Hitung persentase interdependensi dari tabel anp_interdependensi
+        $persentaseInterdependensi = $this->hitungPersentaseInterdependensi();
+        
+        // Hitung progress pairwise comparison
+        $progressPairwise = $this->hitungProgressPairwise();
         
         // Ambil data untuk progress bar
         $kriteriaList = $this->kriteriaModel->findAll();
@@ -56,6 +58,9 @@ class TppController extends BaseController
             ];
         }
         
+        // Ambil status ANP terbaru
+        $statusAnp = $this->getStatusAnpTerbaru();
+        
         $data = [
             'title' => 'Dashboard TPP',
             'page_title' => 'Dashboard Tim Pengamat Pemasyarakatan',
@@ -65,10 +70,143 @@ class TppController extends BaseController
             'kriteriaDenganBobot' => $kriteriaDenganBobot,
             'persentaseBobot' => $persentaseBobot,
             'persentaseInterdependensi' => $persentaseInterdependensi,
+            'progressPairwise' => $progressPairwise,
             'periodeAktif' => $periode,
-            'progressData' => $progressData
+            'progressData' => $progressData,
+            'statusAnp' => $statusAnp
         ];
         
         return view('dashboard/tpp', $data);
+    }
+    
+    private function hitungPersentaseInterdependensi()
+    {
+        try {
+            $db = \Config\Database::connect();
+            
+            // Ambil periode aktif
+            $periodeModel = new \App\Models\PeriodeModel();
+            $periodeAktif = $periodeModel->where('status', 'aktif')->first();
+            $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+            
+            // Hitung total data interdependensi yang sudah diisi (nilai > 0)
+            $builder = $db->table('anp_interdependensi');
+            if ($periodeId) {
+                $builder->where('periode_id', $periodeId);
+            }
+            $filledCount = $builder->where('nilai >', 0)->countAllResults();
+            
+            // Hitung total subkriteria
+            $totalSubkriteria = $this->subkriteriaModel->countAll();
+            
+            // Total kemungkinan interdependensi = n × n (termasuk diagonal)
+            $totalPossible = $totalSubkriteria * $totalSubkriteria;
+            
+            // Persentase = (filled / total) × 100
+            $persentase = $totalPossible > 0 ? round(($filledCount / $totalPossible) * 100, 1) : 0;
+            
+            return $persentase;
+        } catch (\Exception $e) {
+            // Jika tabel belum ada atau error, return 0
+            return 0;
+        }
+    }
+    
+    private function hitungProgressPairwise()
+    {
+        try {
+            $db = \Config\Database::connect();
+            
+            // Ambil periode aktif
+            $periodeModel = new \App\Models\PeriodeModel();
+            $periodeAktif = $periodeModel->where('status', 'aktif')->first();
+            $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+            
+            // Hitung total pairwise yang sudah diisi
+            $builder = $db->table('anp_pairwise_histori');
+            if ($periodeId) {
+                $builder->where('periode_id', $periodeId);
+            }
+            $filledCount = $builder->countAllResults();
+            
+            // Hitung total subkriteria
+            $totalSubkriteria = $this->subkriteriaModel->countAll();
+            
+            // Total kemungkinan pairwise (tanpa diagonal dan reciprocal)
+            // Untuk n subkriteria, total pairwise = n × (n-1) / 2
+            $totalPossible = $totalSubkriteria > 0 ? ($totalSubkriteria * ($totalSubkriteria - 1)) / 2 : 0;
+            
+            // Persentase = (filled / total) × 100
+            $persentase = $totalPossible > 0 ? round(($filledCount / $totalPossible) * 100, 1) : 0;
+            
+            return [
+                'filled' => $filledCount,
+                'total' => $totalPossible,
+                'persentase' => $persentase
+            ];
+        } catch (\Exception $e) {
+            // Jika tabel belum ada atau error, return default
+            return [
+                'filled' => 0,
+                'total' => 0,
+                'persentase' => 0
+            ];
+        }
+    }
+    
+    private function getStatusAnpTerbaru()
+    {
+        try {
+            $db = \Config\Database::connect();
+            
+            // Ambil periode aktif
+            $periodeModel = new \App\Models\PeriodeModel();
+            $periodeAktif = $periodeModel->where('status', 'aktif')->first();
+            $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+            
+            // Cek apakah sudah ada perhitungan ANP untuk periode ini
+            $builder = $db->table('anp_interdependensi');
+            if ($periodeId) {
+                $builder->where('periode_id', $periodeId);
+            }
+            $hasAnpCalculation = $builder->countAllResults() > 0;
+            
+            if (!$hasAnpCalculation) {
+                return [
+                    'status' => 'belum_dihitung',
+                    'message' => 'ANP belum dihitung untuk periode ini',
+                    'color' => 'warning'
+                ];
+            }
+            
+            // Cek konsistensi dari tabel anp_interdependensi
+            // (Dalam implementasi lengkap, bisa ambil dari tabel terpisah yang menyimpan hasil konsistensi)
+            $builder = $db->table('anp_interdependensi');
+            if ($periodeId) {
+                $builder->where('periode_id', $periodeId);
+            }
+            $totalEntries = $builder->countAllResults();
+            
+            // Jika ada data interdependensi, anggap sudah dihitung
+            if ($totalEntries > 0) {
+                return [
+                    'status' => 'sudah_dihitung',
+                    'message' => 'ANP sudah dihitung',
+                    'color' => 'success'
+                ];
+            }
+            
+            return [
+                'status' => 'tidak_diketahui',
+                'message' => 'Status ANP tidak diketahui',
+                'color' => 'secondary'
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Error: ' . $e->getMessage(),
+                'color' => 'danger'
+            ];
+        }
     }
 }

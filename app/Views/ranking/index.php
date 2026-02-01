@@ -110,7 +110,7 @@ $activeMenu = 'ranking';
                                                 <div class="callout callout-<?= $item['preferensi'] >= 0.7 ? 'success' : ($item['preferensi'] >= 0.5 ? 'warning' : 'danger') ?>">
                                                     <h5><i class="fas fa-chart-line"></i> Analisis Preferensi</h5>
                                                     <p>
-                                                        Nilai Preferensi: <strong><?= number_format($item['preferensi'], 4) ?></strong> |
+                                                        Nilai Preferensi (Ci): <strong><?= number_format($item['preferensi'], 4) ?></strong> |
                                                         Status: 
                                                         <?php if ($item['preferensi'] >= 0.7): ?>
                                                             <span class="badge badge-success">Sangat Baik</span>
@@ -120,10 +120,29 @@ $activeMenu = 'ranking';
                                                             <span class="badge badge-danger">Perlu Perhatian</span>
                                                         <?php endif; ?>
                                                     </p>
+                                                    <p>
+                                                        Status Remisi: 
+                                                        <?php
+                                                        // Tentukan status remisi berdasarkan nilai preferensi (Ci)
+                                                        // Kriteria baru: ≥0.85 Remisi Penuh, ≥0.75 Remisi Separuh, <0.75 Tidak Layak Remisi
+                                                        $statusRemisi = '';
+                                                        $badgeClass = '';
+                                                        if ($item['preferensi'] >= 0.85) {
+                                                            $statusRemisi = 'Remisi Penuh';
+                                                            $badgeClass = 'badge-success';
+                                                        } elseif ($item['preferensi'] >= 0.75) {
+                                                            $statusRemisi = 'Remisi Separuh';
+                                                            $badgeClass = 'badge-warning';
+                                                        } else {
+                                                            $statusRemisi = 'Tidak Layak Remisi';
+                                                            $badgeClass = 'badge-danger';
+                                                        }
+                                                        ?>
+                                                        <span class="badge <?= $badgeClass ?>"><?= $statusRemisi ?></span>
+                                                    </p>
                                                     <p class="mb-0">
                                                         <small>
-                                                            Nilai preferensi mendekati 1 menunjukkan performa yang lebih baik.
-                                                            Nilai di atas 0.7 dianggap sangat baik, 0.5-0.7 cukup baik, dan di bawah 0.5 perlu perhatian.
+                                                            Kriteria Remisi: ≥0.85 (Remisi Penuh), ≥0.75 (Remisi Separuh), <0.75 (Tidak Layak Remisi)
                                                         </small>
                                                     </p>
                                                 </div>

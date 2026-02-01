@@ -38,34 +38,44 @@ $activeMenu = $activeMenu ?? 'dashboard';
                     </a>
                 </li>
                 
-                <!-- ANALYTIC NETWORK PROCESS -->
-                <li class="nav-header">ANALYTIC NETWORK PROCESS</li>
+                <!-- KELOLA KRITERIA DAN SUBKRITERIA -->
+                <li class="nav-header">KELOLA KRITERIA</li>
                 
                 <li class="nav-item">
                     <a href="<?= base_url('tpp/kriteria') ?>" class="nav-link <?= $activeMenu == 'kriteria' ? 'active' : '' ?>">
-                        <i class="nav-icon fas fa-balance-scale"></i>
-                        <p>Kelola Kriteria (Cluster)</p>
+                        <i class="nav-icon fas fa-list"></i>
+                        <p>Kelola Kriteria</p>
                     </a>
                 </li>
                 
                 <li class="nav-item">
                     <a href="<?= base_url('tpp/subkriteria') ?>" class="nav-link <?= $activeMenu == 'subkriteria' ? 'active' : '' ?>">
-                        <i class="nav-icon fas fa-list-alt"></i>
-                        <p>Kelola Subkriteria (Node)</p>
+                        <i class="nav-icon fas fa-list-ol"></i>
+                        <p>Kelola Subkriteria</p>
                     </a>
                 </li>
                 
-                <li class="nav-item">
-                    <a href="<?= base_url('tpp/periode') ?>" class="nav-link <?= $activeMenu == 'periode' ? 'active' : '' ?>">
-                        <i class="nav-icon fas fa-calendar-alt"></i>
-                        <p>Kelola Periode</p>
-                    </a>
-                </li>
+                <!-- ANALYTIC NETWORK PROCESS -->
+                <li class="nav-header">ANALYTIC NETWORK PROCESS</li>
                 
                 <li class="nav-item">
-                    <a href="<?= base_url('tpp/anp/input-interdependensi') ?>" class="nav-link <?= $activeMenu == 'input-interdependensi' ? 'active' : '' ?>">
+                    <a href="<?= base_url('tpp/anp/pairwise-comparison') ?>" class="nav-link <?= $activeMenu == 'pairwise-comparison' ? 'active' : '' ?>">
                         <i class="nav-icon fas fa-project-diagram"></i>
-                        <p>Input Interdependensi</p>
+                        <p>Pairwise Comparison</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('tpp/anp/partial-result') ?>" class="nav-link <?= $activeMenu == 'partial-result' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-eye"></i>
+                        <p>Hasil ANP (Parsial)</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('tpp/anp') ?>" class="nav-link <?= $activeMenu == 'anp' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-chart-bar"></i>
+                        <p>Hasil ANP</p>
                     </a>
                 </li>
                 
@@ -76,17 +86,6 @@ $activeMenu = $activeMenu ?? 'dashboard';
                     </a>
                 </li>
                 
-                <!-- LAPORAN -->
-                <li class="nav-header">LAPORAN</li>
-                
-                <li class="nav-item">
-                    <a href="<?= base_url('tpp/anp') ?>" class="nav-link <?= $activeMenu == 'anp' ? 'active' : '' ?>">
-                        <i class="nav-icon fas fa-chart-bar"></i>
-                        <p>Hasil ANP</p>
-                    </a>
-                </li>
-                
-               
             </ul>
         </nav>
     </div>

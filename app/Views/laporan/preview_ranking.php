@@ -130,58 +130,59 @@ $activeMenu = 'laporan';
                         </div>
                         
                         <!-- Tabel Preview -->
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th width="5%">Rank</th>
-                                        <th width="25%">Nama Narapidana</th>
-                                        <th width="15%">Nomor Registrasi</th>
-                                        <th width="20%">Kasus</th>
-                                        <th width="15%">Jarak Positif (D+)</th>
-                                        <th width="15%">Jarak Negatif (D-)</th>
-                                        <th width="15%">Nilai Preferensi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($ranking as $index => $item): ?>
-                                    <tr>
-                                        <td class="text-center"><?= $index + 1 ?></td>
-                                        <td><?= $item['narapidana']['nama_lengkap'] ?></td>
-                                        <td><?= $item['narapidana']['nomor_registrasi'] ?></td>
-                                        <td><?= $item['narapidana']['kasus'] ?? '-' ?></td>
-                                        <td class="text-center"><?= number_format($item['d_positif'], 4) ?></td>
-                                        <td class="text-center"><?= number_format($item['d_negatif'], 4) ?></td>
-                                        <td class="text-center">
-                                            <?php if ($item['preferensi'] >= 0.7): ?>
-                                                <span class="badge badge-success"><?= number_format($item['preferensi'], 4) ?></span>
-                                            <?php elseif ($item['preferensi'] >= 0.5): ?>
-                                                <span class="badge badge-warning"><?= number_format($item['preferensi'], 4) ?></span>
-                                            <?php else: ?>
-                                                <span class="badge badge-danger"><?= number_format($item['preferensi'], 4) ?></span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Tombol Aksi -->
-                        <div class="row mt-4">
-                            <div class="col-md-6">
-                                <a href="<?= base_url('admin/laporan') ?>" class="btn btn-secondary">
-                                    <i class="fas fa-arrow-left"></i> Kembali
-                                </a>
-                            </div>
-                            <div class="col-md-6 text-right">
-                                <a href="<?= base_url('admin/laporan/cetak-ranking?periode=' . $periode) ?>" target="_blank" class="btn btn-primary">
-                                    <i class="fas fa-print"></i> Cetak Laporan
-                                </a>
-                                <a href="<?= base_url('admin/laporan/cetak-ranking?periode=' . $periode . '&download=1') ?>" class="btn btn-success">
-                                    <i class="fas fa-download"></i> Download PDF
-                                </a>
-                            </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th width="5%">Rank</th>
+                                    <th width="15%">Narapidana</th>
+                                    <th width="10%">Kode</th>
+                                    <th width="15%">Nilai S</th>
+                                    <th width="15%">Nilai R</th>
+                                    <th width="15%">Nilai Q</th>
+                                    <th width="15%">Status</th>
+                                    <th width="10%">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($ranking as $index => $row): ?>
+                                <tr class="<?= $row['status'] == 'remisi_penuh' ? 'table-success' : ($row['status'] == 'remisi_separuh' ? 'table-warning' : 'table-danger') ?>">
+                                    <td class="text-center">
+                                        <span class="badge badge-primary"><?= $index + 1 ?></span>
+                                    </td>
+                                    <td>
+                                        <strong><?= $row['nama'] ?></strong><br>
+                                        <small class="text-muted">NIP: <?= $row['nip'] ?></small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-info"><?= $row['kode'] ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-secondary"><?= number_format($row['nilai_s'], 4) ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-warning"><?= number_format($row['nilai_r'], 4) ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-success"><?= number_format($row['nilai_q'], 4) ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge <?= $row['status_class'] ?>">
+                                            <i class="fas fa-star<?= $row['status'] == 'remisi_separuh' ? '-half-alt' : '' ?>"></i>
+                                            <?= $row['status_text'] ?>
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="<?= base_url('admin/laporan/detail-ranking/' . $row['id'] . '?periode=' . $periode) ?>" 
+                                           class="btn btn-info btn-sm">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                         </div>
                         
                         <!-- Catatan -->

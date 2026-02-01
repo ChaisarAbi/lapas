@@ -48,6 +48,41 @@ $activeMenu = $activeMenu ?? 'dashboard';
                     </a>
                 </li>
                 
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/users') ?>" class="nav-link <?= $activeMenu == 'users_admin' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-user-shield"></i>
+                        <p>Kelola Admin</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/users') ?>" class="nav-link <?= $activeMenu == 'users_tpp' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-user-tie"></i>
+                        <p>Kelola TPP</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/users') ?>" class="nav-link <?= $activeMenu == 'users_bimkes' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-user-md"></i>
+                        <p>Kelola BIMKES</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/users') ?>" class="nav-link <?= $activeMenu == 'users_kalapas' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-user-graduate"></i>
+                        <p>Kelola Kalapas</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/users') ?>" class="nav-link <?= $activeMenu == 'users_wali' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-user-friends"></i>
+                        <p>Kelola Wali</p>
+                    </a>
+                </li>
+                
                 <!-- NARAPIDANA MANAGEMENT -->
                 <li class="nav-header">MANAJEMEN NARAPIDANA</li>
                 
@@ -58,15 +93,45 @@ $activeMenu = $activeMenu ?? 'dashboard';
                     </a>
                 </li>
                 
-                <!-- PERHITUNGAN -->
-                <li class="nav-header">PERHITUNGAN</li>
+                <!-- PERIODE MANAGEMENT -->
+                <li class="nav-header">MANAJEMEN PERIODE</li>
                 
                 <li class="nav-item">
-                    <a href="<?= base_url('admin/perhitungan/topsis') ?>" class="nav-link <?= $activeMenu == 'topsis' ? 'active' : '' ?>">
-                        <i class="nav-icon fas fa-calculator"></i>
-                        <p>Perhitungan TOPSIS</p>
+                    <a href="<?= base_url('admin/periode') ?>" class="nav-link <?= $activeMenu == 'periode' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-calendar-alt"></i>
+                        <p>Kelola Periode</p>
                     </a>
                 </li>
+                
+                <!-- KRITERIA & SUBKRITERIA MANAGEMENT -->
+                <li class="nav-header">MANAJEMEN KRITERIA</li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/kriteria') ?>" class="nav-link <?= $activeMenu == 'kriteria' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-list-alt"></i>
+                        <p>Kelola Kriteria</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/subkriteria') ?>" class="nav-link <?= $activeMenu == 'subkriteria' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-list"></i>
+                        <p>Kelola Subkriteria</p>
+                    </a>
+                </li>
+                
+                <!-- HASIL ANP -->
+                <li class="nav-header">HASIL ANP</li>
+                
+                <li class="nav-item">
+                    <a href="<?= base_url('admin/anp') ?>" class="nav-link <?= $activeMenu == 'anp' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-chart-pie"></i>
+                        <p>Hasil ANP</p>
+                    </a>
+                </li>
+                
+                <!-- PERHITUNGAN - DIHAPUS sesuai permintaan user -->
+                <!-- Gunakan manajemen laporan admin untuk perhitungan dan cetak laporan -->
                 
                 <!-- LAPORAN -->
                 <li class="nav-header">LAPORAN</li>
