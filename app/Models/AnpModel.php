@@ -421,6 +421,181 @@ class AnpModel extends Model
     }
 
     /**
+     * Get histori pairwise by target node
+     */
+    public function getHistoriPairwiseByTarget($targetNodeId, $periodeId = null)
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('anp_pairwise_histori')
+            ->where('target_node_id', $targetNodeId);
+        
+        if ($periodeId) {
+            $builder->where('periode_id', $periodeId);
+        }
+        
+        $builder->orderBy('node_dari_id', 'ASC')
+                ->orderBy('node_ke_id', 'ASC');
+        
+        return $builder->get()->getResultArray();
+    }
+
+    /**
+     * Upsert pairwise comparison (target-based)
+     */
+    public function upsertPairwise($periodeId, $targetId, $fromId, $toId, $value, 
+                                   $fromKode = null, $fromNama = null, 
+                                   $toKode = null, $toNama = null,
+                                   $targetKode = null, $targetNama = null)
+    {
+        $db = \Config\Database::connect();
+        
+        // Cek apakah pairwise sudah ada
+        $existing = $db->table('anp_pairwise_histori')
+            ->where('periode_id', $periodeId)
+            ->where('target_node_id', $targetId)
+            ->where('node_dari_id', $fromId)
+            ->where('node_ke_id', $toId)
+            ->get()
+            ->getRowArray();
+        
+        $data = [
+            'periode_id' => $periodeId,
+            'target_node_id' => $targetId,
+            'target_node_kode' => $targetKode,
+            'target_node_nama' => $targetNama,
+            'node_dari_id' => $fromId,
+            'node_dari_kode' => $fromKode,
+            'node_dari_nama' => $fromNama,
+            'node_ke_id' => $toId,
+            'node_ke_kode' => $toKode,
+            'node_ke_nama' => $toNama,
+            'skala' => $value,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        
+        if ($existing) {
+            // Update existing
+            $db->table('anp_pairwise_histori')
+                ->where('id', $existing['id'])
+                ->update($data);
+            return 'updated';
+        } else {
+            // Insert new
+            $data['created_at'] = date('Y-m-d H:i:s');
+            $db->table('anp_pairwise_histori')->insert($data);
+            return 'inserted';
+        }
+    }
+
+    /**
+     * Build matrix for specific target node
+     */
+    public function buildMatrixForTarget($targetNodeId, $periodeId = null)
+    {
+        $edgeModel = new \App\Models\EdgeModel();
+        $subkriteriaModel = new \App\Models\SubkriteriaModel();
+        
+        // Get influencer nodes for this target
+        $influencers = $edgeModel->getInfluencerNodes($targetNodeId, $periodeId);
+        
+        if (empty($influencers)) {
+            return [
+                'influencers' => [],
+                'matrix' => [],
+                'filled_pairs' => 0,
+                'total_pairs' => 0,
+                'progress_percentage' => 0
+            ];
+        }
+        
+        // Get pairwise data for this target
+        $pairwiseData = $this->getHistoriPairwiseByTarget($targetNodeId, $periodeId);
+        
+        // Create mapping for quick lookup
+        $pairwiseMap = [];
+        foreach ($pairwiseData as $pair) {
+            $key = $pair['node_dari_id'] . '_' . $pair['node_ke_id'];
+            $pairwiseMap[$key] = (float)$pair['skala'];
+        }
+        
+        // Build matrix
+        $k = count($influencers);
+        $matrix = array_fill(0, $k, array_fill(0, $k, 0.0));
+        
+        // Fill matrix
+        $filledPairs = 0;
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = 0; $j < $k; $j++) {
+                if ($i == $j) {
+                    // Diagonal = 1
+                    $matrix[$i][$j] = 1.0;
+                } else {
+                    $nodeI = $influencers[$i]['id'];
+                    $nodeJ = $influencers[$j]['id'];
+                    
+                    // Cek pairwise i->j
+                    $key = $nodeI . '_' . $nodeJ;
+                    if (isset($pairwiseMap[$key])) {
+                        $matrix[$i][$j] = $pairwiseMap[$key];
+                        $filledPairs++;
+                    } else {
+                        // Cek pairwise j->i (reciprocal)
+                        $reverseKey = $nodeJ . '_' . $nodeI;
+                        if (isset($pairwiseMap[$reverseKey])) {
+                            $matrix[$i][$j] = 1 / $pairwiseMap[$reverseKey];
+                            $filledPairs++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Calculate progress
+        $totalPairs = $k * ($k - 1) / 2; // Unique pairs (upper triangle)
+        $progressPercentage = $totalPairs > 0 ? ($filledPairs / $totalPairs) * 100 : 0;
+        
+        return [
+            'influencers' => $influencers,
+            'matrix' => $matrix,
+            'filled_pairs' => $filledPairs,
+            'total_pairs' => $totalPairs,
+            'progress_percentage' => $progressPercentage
+        ];
+    }
+
+    /**
+     * Get all target nodes with their progress
+     */
+    public function getTargetsWithProgress($periodeId = null)
+    {
+        $db = \Config\Database::connect();
+        $edgeModel = new \App\Models\EdgeModel();
+        
+        // Get all unique target nodes from edges
+        $targets = $db->table('anp_edges e')
+            ->select('e.to_node_id as id, s.kode, s.nama, s.kriteria_id, k.nama as kriteria_nama')
+            ->distinct()
+            ->join('subkriteria s', 's.id = e.to_node_id')
+            ->join('kriteria k', 'k.id = s.kriteria_id')
+            ->where('e.periode_id', $periodeId)
+            ->orderBy('s.kriteria_id', 'ASC')
+            ->orderBy('s.kode', 'ASC')
+            ->get()
+            ->getResultArray();
+        
+        // Calculate progress for each target
+        foreach ($targets as &$target) {
+            $matrixData = $this->buildMatrixForTarget($target['id'], $periodeId);
+            $target['influencer_count'] = count($matrixData['influencers']);
+            $target['filled_pairs'] = $matrixData['filled_pairs'];
+            $target['total_pairs'] = $matrixData['total_pairs'];
+            $target['progress_percentage'] = $matrixData['progress_percentage'];
+        }
+        
+        return $targets;
+    }
+
+    /**
      * Build interdependensi matrix from histori pairwise data
      */
     public function bangunMatriksDariHistori($periodeId = null)
@@ -480,5 +655,117 @@ class AnpModel extends Model
 
         log_message('debug', '=== SELESAI bangunMatriksDariHistori ===');
         return $matriks;
+    }
+
+    /**
+     * Calculate AHP report for target matrix
+     */
+    public function calculateAhpReport($matrix, $influencers)
+    {
+        $k = count($matrix);
+        if ($k == 0) {
+            return null;
+        }
+
+        // Check if matrix is complete (no zeros except diagonal)
+        $isComplete = true;
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = 0; $j < $k; $j++) {
+                if ($i != $j && $matrix[$i][$j] == 0) {
+                    $isComplete = false;
+                    break 2;
+                }
+            }
+        }
+
+        // Calculate column sums
+        $colSum = array_fill(0, $k, 0.0);
+        for ($j = 0; $j < $k; $j++) {
+            for ($i = 0; $i < $k; $i++) {
+                $colSum[$j] += $matrix[$i][$j];
+            }
+        }
+
+        // Normalize matrix (N[i][j] = A[i][j] / colSum[j])
+        $normalized = array_fill(0, $k, array_fill(0, $k, 0.0));
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = 0; $j < $k; $j++) {
+                if ($colSum[$j] > 0) {
+                    $normalized[$i][$j] = $matrix[$i][$j] / $colSum[$j];
+                }
+            }
+        }
+
+        // Calculate priority vector (weights) - average of rows
+        $weights = array_fill(0, $k, 0.0);
+        for ($i = 0; $i < $k; $i++) {
+            $rowSum = 0.0;
+            for ($j = 0; $j < $k; $j++) {
+                $rowSum += $normalized[$i][$j];
+            }
+            $weights[$i] = $rowSum / $k;
+        }
+
+        // Normalize weights to sum to 1
+        $weightSum = array_sum($weights);
+        if ($weightSum > 0) {
+            for ($i = 0; $i < $k; $i++) {
+                $weights[$i] /= $weightSum;
+            }
+        }
+
+        // Calculate Aw = A * w
+        $aw = array_fill(0, $k, 0.0);
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = 0; $j < $k; $j++) {
+                $aw[$i] += $matrix[$i][$j] * $weights[$j];
+            }
+        }
+
+        // Calculate lambda_i = Aw[i] / w[i]
+        $lambda_i = array_fill(0, $k, 0.0);
+        for ($i = 0; $i < $k; $i++) {
+            if ($weights[$i] > 0) {
+                $lambda_i[$i] = $aw[$i] / $weights[$i];
+            }
+        }
+
+        // Calculate lambda_max (average of lambda_i)
+        $lambda_max = array_sum($lambda_i) / $k;
+
+        // Calculate CI = (lambda_max - k) / (k - 1)
+        $ci = ($k > 1) ? ($lambda_max - $k) / ($k - 1) : 0;
+
+        // Random Index (RI) - Saaty's values
+        $riTable = [0, 0, 0.58, 0.90, 1.12, 1.24, 1.32, 1.41, 1.45, 1.49];
+        $ri = isset($riTable[$k]) ? $riTable[$k] : 1.49;
+
+        // Calculate CR = CI / RI
+        $cr = ($ri > 0) ? $ci / $ri : 0;
+
+        // Check consistency
+        $konsisten = $cr <= 0.1;
+
+        // Prepare result
+        $result = [
+            'k' => $k,
+            'matrixA' => $matrix,
+            'colSum' => $colSum,
+            'normalized' => $normalized,
+            'weights' => $weights,
+            'aw' => $aw,
+            'lambda_i' => $lambda_i,
+            'lambda_max' => $lambda_max,
+            'ci' => $ci,
+            'ri' => $ri,
+            'cr' => $cr,
+            'konsisten' => $konsisten,
+            'isComplete' => $isComplete
+        ];
+
+        // Map influencer data to result
+        $result['influencers'] = $influencers;
+
+        return $result;
     }
 }

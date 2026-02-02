@@ -59,9 +59,16 @@ $activeMenu = $activeMenu ?? 'dashboard';
                 <li class="nav-header">ANALYTIC NETWORK PROCESS</li>
                 
                 <li class="nav-item">
+                    <a href="<?= base_url('tpp/anp/pairwise-target') ?>" class="nav-link <?= $activeMenu == 'pairwise-target' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-bullseye"></i>
+                        <p>Pairwise (Target-First)</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
                     <a href="<?= base_url('tpp/anp/pairwise-comparison') ?>" class="nav-link <?= $activeMenu == 'pairwise-comparison' ? 'active' : '' ?>">
                         <i class="nav-icon fas fa-project-diagram"></i>
-                        <p>Pairwise Comparison</p>
+                        <p>Pairwise (Legacy)</p>
                     </a>
                 </li>
                 

@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Models\KriteriaModel;
 use App\Models\SubkriteriaModel;
 use App\Models\AnpModel;
+use App\Models\EdgeModel;
 use App\Models\PeriodeModel;
 
 class TppAnpController extends BaseController
@@ -20,6 +21,440 @@ class TppAnpController extends BaseController
         $this->subkriteriaModel = new SubkriteriaModel();
         $this->anpModel = new AnpModel();
         $this->periodeModel = new PeriodeModel();
+    }
+
+    /**
+     * Pairwise comparison dengan target-first approach
+     */
+    public function pairwiseTarget()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+        
+        // Ambil semua subkriteria dengan info kriteria
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        
+        // Semua subkriteria adalah target nodes (tidak perlu edges)
+        $targets = $subkriteria; // Semua subkriteria bisa menjadi target
+        
+        // Ambil target yang dipilih dari query string
+        $selectedTargetId = $this->request->getGet('target_id');
+        $selectedTarget = null;
+        $matrixData = null;
+        $ahpReport = null;
+        
+        if ($selectedTargetId) {
+            // Cari target yang dipilih
+            foreach ($targets as $target) {
+                if ($target['id'] == $selectedTargetId) {
+                    $selectedTarget = $target;
+                    break;
+                }
+            }
+            
+        if ($selectedTarget) {
+            // Bangun matrix untuk target ini - semua subkriteria lain adalah influencer
+            $matrixData = $this->buildMatrixForTargetNoEdges($selectedTargetId, $periodeId, $subkriteria);
+            
+            // Hitung apakah matrix sudah lengkap
+            if ($matrixData && !empty($matrixData['influencers'])) {
+                $k = count($matrixData['influencers']);
+                $totalPairs = $k * ($k - 1) / 2; // Unique pairs (upper triangle)
+                $filledPairs = $matrixData['filled_pairs'];
+                $isComplete = ($filledPairs >= $totalPairs && $k >= 2);
+                
+                // Tambahkan data completeness ke matrixData
+                $matrixData['is_complete'] = $isComplete;
+                $matrixData['k'] = $k;
+                $matrixData['total_pairs'] = $totalPairs;
+                $matrixData['filled_pairs'] = $filledPairs;
+                $matrixData['progress_percentage'] = $totalPairs > 0 ? round(($filledPairs / $totalPairs) * 100, 1) : 0;
+                
+                // Hitung AHP report hanya jika matrix sudah lengkap
+                if ($isComplete && !empty($matrixData['matrix'])) {
+                    $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+                } else {
+                    $ahpReport = null;
+                }
+            } else {
+                $ahpReport = null;
+            }
+        } else {
+            $ahpReport = null;
+        }
+        }
+        
+        $data = [
+            'title' => 'Pairwise Comparison ANP (Target-First) - SPK Pembinaan',
+            'subkriteria' => $subkriteria,
+            'targets' => $targets,
+            'selected_target' => $selectedTarget,
+            'matrix_data' => $matrixData,
+            'ahp_report' => $ahpReport ?? null,
+            'periode' => $periodeAktif,
+            'activeMenu' => 'pairwise-target'
+        ];
+        
+        return view('tpp_anp/pairwise_target', $data);
+    }
+    
+    /**
+     * Bangun matrix untuk target tanpa menggunakan edges
+     * Semua subkriteria lain adalah influencer
+     */
+    private function buildMatrixForTargetNoEdges($targetId, $periodeId, $allSubkriteria)
+    {
+        // Filter influencer: semua subkriteria kecuali target itu sendiri
+        $influencers = array_filter($allSubkriteria, function($sub) use ($targetId) {
+            return $sub['id'] != $targetId;
+        });
+        $influencers = array_values($influencers); // Reset indices
+        
+        if (empty($influencers)) {
+            return null;
+        }
+        
+        // Buat matriks kosong
+        $k = count($influencers);
+        $matrix = array_fill(0, $k, array_fill(0, $k, 0));
+        
+        // Ambil pairwise yang sudah ada untuk target ini
+        $db = \Config\Database::connect();
+        $pairwiseData = $db->table('anp_pairwise_histori')
+            ->where('target_node_id', $targetId)
+            ->where('periode_id', $periodeId)
+            ->get()
+            ->getResultArray();
+        
+        // Mapping influencer ID ke index
+        $idToIndex = [];
+        foreach ($influencers as $index => $inf) {
+            $idToIndex[$inf['id']] = $index;
+        }
+        
+        // Isi matrix dari data pairwise
+        foreach ($pairwiseData as $pairwise) {
+            $dariIndex = $idToIndex[$pairwise['node_dari_id']] ?? null;
+            $keIndex = $idToIndex[$pairwise['node_ke_id']] ?? null;
+            
+            if ($dariIndex !== null && $keIndex !== null) {
+                $matrix[$dariIndex][$keIndex] = (float)$pairwise['skala'];
+            }
+        }
+        
+        // Isi diagonal dengan 1
+        for ($i = 0; $i < $k; $i++) {
+            $matrix[$i][$i] = 1;
+            
+            // Isi nilai kebalikan (reciprocal) jika ada
+            for ($j = 0; $j < $k; $j++) {
+                if ($i != $j && $matrix[$i][$j] > 0 && $matrix[$j][$i] == 0) {
+                    $matrix[$j][$i] = 1 / $matrix[$i][$j];
+                }
+            }
+        }
+        
+        // Hitung jumlah unique pairs yang sudah terisi
+        $filledPairs = 0;
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = $i + 1; $j < $k; $j++) {
+                if ($matrix[$i][$j] > 0 || $matrix[$j][$i] > 0) {
+                    $filledPairs++;
+                }
+            }
+        }
+        
+        return [
+            'matrix' => $matrix,
+            'influencers' => $influencers,
+            'filled_pairs' => $filledPairs
+        ];
+    }
+
+    /**
+     * Simpan pairwise untuk target tertentu (server-rendered)
+     */
+    public function simpanPairwiseTarget()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+
+        $periodeId = $periodeAktif['id'];
+
+        // Ambil data dari POST
+        $targetId = $this->request->getPost('target_id');
+        $fromId   = $this->request->getPost('node_dari');
+        $toId     = $this->request->getPost('node_ke');
+        $skala    = $this->request->getPost('skala');
+
+        // Validasi
+        if (!$targetId || !$fromId || !$toId || !$skala) {
+            return redirect()->back()->withInput()->with('error', 'Semua field harus diisi.');
+        }
+
+        if ($fromId == $toId) {
+            return redirect()->back()->withInput()->with('error', 'Node dari dan node ke tidak boleh sama.');
+        }
+
+        $skala = floatval($skala);
+        if ($skala < 1 || $skala > 9) {
+            return redirect()->back()->withInput()->with('error', 'Skala harus antara 1-9.');
+        }
+
+        // Ambil data subkriteria
+        $targetData = $this->subkriteriaModel->find($targetId);
+        $fromData   = $this->subkriteriaModel->find($fromId);
+        $toData     = $this->subkriteriaModel->find($toId);
+
+        if (!$targetData || !$fromData || !$toData) {
+            return redirect()->back()->withInput()->with('error', 'Data subkriteria tidak ditemukan.');
+        }
+
+        // Simpan pairwise
+        $result = $this->anpModel->upsertPairwise(
+            $periodeId,
+            $targetId,
+            $fromId,
+            $toId,
+            $skala,
+            $fromData['kode'],
+            $fromData['nama'],
+            $toData['kode'],
+            $toData['nama'],
+            $targetData['kode'],
+            $targetData['nama']
+        );
+
+        $message = ($result === 'updated') ? 'Pairwise berhasil diperbarui.' : 'Pairwise berhasil ditambahkan.';
+
+        return redirect()->to('/tpp/anp/pairwise-target?target_id=' . $targetId)->with('success', $message);
+    }
+
+    /**
+     * Simpan edges (panah ANP)
+     */
+    public function simpanEdges()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        $periodeId = $periodeAktif['id'];
+        
+        // Ambil data dari POST
+        $edges = $this->request->getPost('edges');
+        
+        if (empty($edges)) {
+            return redirect()->back()->withInput()->with('error', 'Tidak ada edges yang dikirim.');
+        }
+        
+        // Parse edges data
+        $edgesData = [];
+        foreach ($edges as $edge) {
+            $parts = explode('_', $edge);
+            if (count($parts) === 2) {
+                $edgesData[] = [
+                    'from_node_id' => $parts[0],
+                    'to_node_id' => $parts[1]
+                ];
+            }
+        }
+        
+        // Simpan edges
+        $edgeModel = new EdgeModel();
+        $saved = $edgeModel->saveEdges($edgesData, $periodeId);
+        
+        if ($saved > 0) {
+            return redirect()->to('/tpp/anp/pairwise-target')->with('success', "Edges berhasil disimpan ($saved data)");
+        } else {
+            return redirect()->back()->withInput()->with('error', 'Gagal menyimpan edges.');
+        }
+    }
+
+    /**
+     * Auto fill pairwise untuk target tertentu
+     */
+    /**
+     * Auto fill pairwise untuk target tertentu (server-rendered)
+     */
+    public function autoFillPairwiseTarget()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            return redirect()->back()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        $periodeId = $periodeAktif['id'];
+
+        $targetId = $this->request->getPost('target_id');
+        if (!$targetId) {
+            return redirect()->back()->with('error', 'Target ID tidak ditemukan.');
+        }
+
+        $targetData = $this->subkriteriaModel->find($targetId);
+        if (!$targetData) {
+            return redirect()->back()->with('error', 'Target tidak ditemukan.');
+        }
+
+        $all = $this->subkriteriaModel->getWithKriteria();
+        $influencers = array_values(array_filter($all, function($s) use ($targetId) {
+            return $s['id'] != $targetId;
+        }));
+        if (count($influencers) < 2) {
+            return redirect()->back()->with('error', 'Influencer kurang dari 2, tidak bisa dibuat pairwise.');
+        }
+
+        // existing pairwise unique map
+        $existingPairwise = $this->anpModel->getHistoriPairwiseByTarget($targetId, $periodeId);
+        $existing = [];
+        foreach ($existingPairwise as $p) {
+            $key = min($p['node_dari_id'], $p['node_ke_id']) . '_' . max($p['node_dari_id'], $p['node_ke_id']);
+            $existing[$key] = true;
+        }
+
+        $addedCount = 0;
+        $k = count($influencers);
+
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = $i + 1; $j < $k; $j++) {
+                $a = $influencers[$i]['id'];
+                $b = $influencers[$j]['id'];
+                $key = min($a,$b) . '_' . max($a,$b);
+
+                if (!isset($existing[$key])) {
+                    // simpan satu arah saja, reciprocal akan dibangun di matrix builder
+                    $this->anpModel->upsertPairwise(
+                        $periodeId,
+                        $targetId,
+                        $a,
+                        $b,
+                        1.0,
+                        $influencers[$i]['kode'],
+                        $influencers[$i]['nama'],
+                        $influencers[$j]['kode'],
+                        $influencers[$j]['nama'],
+                        $targetData['kode'],
+                        $targetData['nama']
+                    );
+                    $addedCount++;
+                }
+            }
+        }
+
+        $msg = ($addedCount > 0)
+            ? "Auto fill berhasil! $addedCount pairwise ditambahkan dengan nilai 1."
+            : "Semua pairwise untuk target ini sudah terisi.";
+
+        return redirect()->to('/tpp/anp/pairwise-target?target_id=' . $targetId)->with('success', $msg);
+    }
+
+    /**
+     * Hitung ANP dengan pendekatan target-first (server-rendered)
+     */
+    public function hitungAnpTargetFirst()
+    {
+        try {
+            // Periode aktif
+            $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+            if (!$periodeAktif) {
+                return redirect()->back()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+            }
+            $periodeId = $periodeAktif['id'];
+
+            // Semua node
+            $subkriteria = $this->subkriteriaModel->getWithKriteria();
+            if (empty($subkriteria)) {
+                return redirect()->back()->with('error', 'Tidak ada subkriteria. Tambahkan subkriteria terlebih dahulu.');
+            }
+
+            $n = count($subkriteria);
+
+            // Map id -> index
+            $idToIndex = [];
+            foreach ($subkriteria as $idx => $sk) {
+                $idToIndex[$sk['id']] = $idx;
+            }
+
+            // Matrix bobot pengaruh (rows = influencer, cols = target)
+            $W = array_fill(0, $n, array_fill(0, $n, 0.0));
+
+            // diagonal self influence
+            for ($i = 0; $i < $n; $i++) $W[$i][$i] = 1.0;
+
+            $completeTargetCount = 0;
+
+            // Loop tiap node sebagai TARGET
+            foreach ($subkriteria as $tIndex => $target) {
+                $targetId = $target['id'];
+
+                // build matrix (influencers = semua node kecuali target)
+                $matrixData = $this->buildMatrixForTargetNoEdges($targetId, $periodeId, $subkriteria);
+                if (!$matrixData || empty($matrixData['influencers'])) {
+                    continue;
+                }
+
+                $k = count($matrixData['influencers']);
+                if ($k < 2) continue;
+
+                $totalPairs = $k * ($k - 1) / 2;
+                $filledPairs = $matrixData['filled_pairs'] ?? 0;
+
+                // harus lengkap baru dipakai
+                if ($filledPairs < $totalPairs) {
+                    continue;
+                }
+
+                // hitung bobot influencer terhadap target
+                $ahp = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+                if (!$ahp || empty($ahp['weights'])) continue;
+
+                foreach ($matrixData['influencers'] as $infIdx => $inf) {
+                    $iIndex = $idToIndex[$inf['id']] ?? null;
+                    if ($iIndex === null) continue;
+
+                    // influencer -> target = bobot
+                    $W[$iIndex][$tIndex] = (float)$ahp['weights'][$infIdx];
+                }
+
+                $completeTargetCount++;
+            }
+
+            if ($completeTargetCount === 0) {
+                return redirect()->back()->with('error', 'Belum ada target yang matriksnya lengkap. Lengkapi pairwise dulu, lalu hitung.');
+            }
+
+            // Convert ke interdependensiData (yang dipakai buildSupermatrix)
+            $interdependensiData = [];
+            for ($i = 0; $i < $n; $i++) {
+                for ($j = 0; $j < $n; $j++) {
+                    $interdependensiData[] = [
+                        'cluster_id_dari' => $subkriteria[$i]['kriteria_id'],
+                        'cluster_id_ke'   => $subkriteria[$j]['kriteria_id'],
+                        'kriteria_id_dari'=> $subkriteria[$i]['id'],
+                        'kriteria_id_ke'  => $subkriteria[$j]['id'],
+                        'nilai'           => $W[$i][$j],
+                        'tipe'            => 'element_to_element',
+                        'periode_id'      => $periodeId
+                    ];
+                }
+            }
+
+            // simpan matrix hasil ke tabel interdependensi
+            $saved = $this->anpModel->saveMatrix($interdependensiData, $periodeId);
+
+            $msg = "Hitung ANP (Target-First) berhasil. Interdependensi tersimpan ($saved records).";
+            return redirect()->to('/tpp/anp')->with('success', $msg);
+
+        } catch (\Throwable $e) {
+            $msg = 'Error hitung ANP Target-First: ' . $e->getMessage();
+            return redirect()->back()->with('error', $msg);
+        }
     }
 
     public function index()
@@ -1011,4 +1446,63 @@ class TppAnpController extends BaseController
         
         return view('tpp_anp/partial_anp_result', $data);
     }
+
+    /**
+     * Render partial HTML untuk tabel matrix dan report
+     */
+    public function renderResultTables()
+{
+    if (!$this->request->isAJAX()) {
+        return $this->response->setJSON(['success' => false, 'message' => 'Invalid request method']);
+    }
+
+    $targetId = $this->request->getGet('target_id');
+    if (!$targetId) {
+        return $this->response->setJSON(['success' => false, 'message' => 'Target ID tidak ditemukan']);
+    }
+
+    $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+    if (!$periodeAktif) {
+        return $this->response->setJSON(['success' => false, 'message' => 'Tidak ada periode aktif.']);
+    }
+    $periodeId = $periodeAktif['id'];
+
+    $allSubkriteria = $this->subkriteriaModel->getWithKriteria();
+
+    // ✅ PAKAI NO-EDGES
+    $matrixData = $this->buildMatrixForTargetNoEdges($targetId, $periodeId, $allSubkriteria);
+
+    if (!$matrixData || empty($matrixData['influencers'])) {
+        return $this->response->setJSON(['success' => false, 'message' => 'Tidak ada influencer untuk target ini']);
+    }
+
+    $k = count($matrixData['influencers']);
+    $totalPairs = $k * ($k - 1) / 2;
+    $filledPairs = $matrixData['filled_pairs'];
+    $isComplete = ($filledPairs >= $totalPairs && $k >= 2);
+
+    $matrixData['is_complete'] = $isComplete;
+    $matrixData['k'] = $k;
+    $matrixData['total_pairs'] = $totalPairs;
+    $matrixData['filled_pairs'] = $filledPairs;
+
+    $ahpReport = null;
+    if ($isComplete && !empty($matrixData['matrix'])) {
+        $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+    }
+
+    $html = view('tpp_anp/_result_tables', [
+        'matrix_data' => $matrixData,
+        'ahp_report' => $ahpReport
+    ]);
+
+    return $this->response->setJSON([
+        'success' => true,
+        'html' => $html,
+        'is_complete' => $isComplete,
+        'filled_pairs' => $filledPairs,
+        'total_pairs' => $totalPairs
+    ]);
+}
+
 }
