@@ -24,7 +24,7 @@
 
 5. **Jalankan seeding untuk semua data**:
    ```bash
-   # Seed untuk user (Wali, Kalapas, Bimkes)
+   # Seed untuk user (Admin, TPP, Bimkes, Wali, Kalapas)
    php spark db:seed "App\Database\Seeds\AddWaliAndKalapasUsers" --force
 
    # Seed untuk data ANP BIMKES (kriteria, subkriteria, edges, pairwise comparison)
@@ -48,9 +48,9 @@
 
 ### 1. AddWaliAndKalapasUsers.php
 - Menambahkan user dengan role:
-  - `tpp02` (TPP) - Password: tpp123
-  - `bimkes02` (BIMKEMASWAT) - Password: bimkes123
-  - `bimkes03` (BIMKEMASWAT) - Password: bimkes123  
+  - `admin` (ADMIN) - Password: admin123
+  - `tpp01` (TPP) - Password: tpp123
+  - `bimkes01` (BIMKEMASWAT) - Password: bimkes123  
   - `wali01` (WALI_PEMASYARAKATAN) - Password: wali123
   - `kalapas01` (KEPALA_LAPAS) - Password: kalapas123
 
@@ -138,12 +138,12 @@ Setelah update, buka browser dan test fitur:
    - Verifikasi menu Dashboard, Kriteria, Subkriteria, Laporan
 
 2. **Login sebagai TPP**:
-   - Username: `tpp02`
+   - Username: `tpp01`
    - Password: `tpp123`
    - Verifikasi menu ANP Target First dan Hasil ANP
 
 3. **Login sebagai BIMKEMASWAT**:
-   - Username: `bimkes02`
+   - Username: `bimkes01`
    - Password: `bimkes123`
    - Verifikasi menu Penilaian BIMKEMASWAT
 
