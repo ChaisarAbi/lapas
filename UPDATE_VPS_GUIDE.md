@@ -1,209 +1,160 @@
-# Panduan Update Web di VPS
+# Panduan Update VPS
 
-## Informasi Update
-**Branch:** `implementasi-anp`  
-**Commit:** `7015e80`  
-**Tanggal:** 3 Februari 2026  
-**Perubahan:** Implementasi algoritma TOPSIS untuk perhitungan ranking narapidana dan konsistensi across all views
+## Langkah-langkah Update
 
-## Fitur yang Diperbarui
+1. **Login ke VPS**:
+   ```bash
+   ssh username@IP_VPS
+   ```
 
-### 1. Perhitungan Ranking TOPSIS Konsisten
-- **Algoritma TOPSIS Standar** - Diimplementasikan dengan benar sesuai metode TOPSIS standar
-- **Konsistensi Across Views** - Semua view yang menampilkan ranking (validasi, preview cetak, cetak laporan) now use the same TOPSIS implementation
-- **Perhitungan Akurat** - Handle berbagai kasus khusus (semua nilai sama, division by zero, data kosong)
+2. **Navigasi ke direktori project**:
+   ```bash
+   cd /var/www/html/lapas
+   ```
 
-### 2. Fitur Utama yang Diubah
-- **KalapasController** - Added `hitungTOPSIS` method (mirroring RankingController)
-- **Validasi View** - Uses TOPSIS instead of simple ranking
-- **Preview Cetak View** - Uses TOPSIS instead of simple ranking  
-- **Cetak Laporan View** - Uses TOPSIS instead of simple ranking
-- **RankingController** - Updated TOPSIS method to be consistent with RankingController
+3. **Pull latest changes dari GitHub**:
+   ```bash
+   git pull origin implementasi-anp
+   ```
 
-### 3. Detail Perhitungan TOPSIS
-- **Matriks Keputusan** - Menghitung rata-rata nilai per kriteria dari subkriteria
-- **Normalisasi** - Normalisasi matriks keputusan dengan metode euclidean
-- **Matriks Terbobot** - Menggunakan bobot kriteria dari database
-- **Solusi Ideal** - Menentukan solusi ideal positif dan negatif per kriteria
-- **Perhitungan Jarak** - Hitung jarak ke solusi ideal positif (D+) dan negatif (D-)
-- **Nilai Preferensi** - Menghitung Ci = D-/(D+ + D-) sebagai indikator preferensi
+4. **Jalankan migrations**:
+   ```bash
+   php spark migrate
+   ```
 
-### 4. Status Remisi Perbaikan
-- **Remisi Penuh** - Nilai preferensi ≥ 0.8500
-- **Remisi Separuh** - Nilai preferensi ≥ 0.7500  
-- **Tidak Layak Remisi** - Nilai preferensi < 0.7500
+5. **Jalankan seeding untuk semua data**:
+   ```bash
+   # Seed untuk user (Wali, Kalapas, Bimkes)
+   php spark db:seed "App\Database\Seeds\AddWaliAndKalapasUsers" --force
 
-## Langkah-langkah Update di VPS
+   # Seed untuk data ANP BIMKES (kriteria, subkriteria, edges, pairwise comparison)
+   php spark db:seed "App\Database\Seeds\AnpBimkesSeeder" --force
 
-### 1. Backup Database (Wajib!)
-```bash
-# Login ke VPS
-ssh user@vps-ip
+   # Seed untuk data comprehensive (narapidana, penilaian, validasi)
+   php spark db:seed "App\Database\Seeds\ComprehensiveSeeder" --force
+   ```
 
-# Backup database
-mysqldump -u username -p nama_database > backup_$(date +%Y%m%d_%H%M%S).sql
+6. **Clear cache**:
+   ```bash
+   php spark cache:clear
+   ```
+
+7. **Restart web server**:
+   ```bash
+   sudo systemctl restart apache2
+   ```
+
+## Daftar Seed dan Fungsi
+
+### 1. AddWaliAndKalapasUsers.php
+- Menambahkan user dengan role:
+  - `tpp02` (TPP) - Password: tpp123
+  - `bimkes02` (BIMKEMASWAT) - Password: bimkes123
+  - `bimkes03` (BIMKEMASWAT) - Password: bimkes123  
+  - `wali01` (WALI_PEMASYARAKATAN) - Password: wali123
+  - `kalapas01` (KEPALA_LAPAS) - Password: kalapas123
+
+### 2. AnpBimkesSeeder.php
+- **4 Kriteria/Clusters**: Kepribadian (KP), Kemandirian (KM), Sikap (S), Mental (M)
+- **10 Subkriteria**:
+  - KP1-KP3 (Kepribadian: Kesadaran Beragama, Kesadaran Hukum, Konseling & Rehabilitasi)
+  - KM1-KM2 (Kemandirian: Pelatihan Keterampilan, Produksi Barang/Jasa)
+  - S1-S2 (Sikap: Keberfungsian & Rutinitas, Pelanggaran Hukum)
+  - M1-M3 (Mental: Depresi, Kecemasan, Potensi Bunuh Diri)
+- **28 Edges**: Relasi antar subkriteria (influencer → target)
+- **56 Pairwise Comparison Data**: Data perbandingan pairwise untuk ANP
+- **1 Periode Aktif**: Periode aktif (bulan saat ini)
+
+### 3. ComprehensiveSeeder.php
+- **45 Narapidana**: Data narapidana dengan berbagai jenis kejahatan dan profil
+- **6 Kriteria**: Kedisiplinan, Kepatuhan, Keterampilan, Perilaku Sosial, Kesehatan, Motivasi Perubahan
+- **18 Subkriteria**: Subkriteria untuk masing-masing kriteria
+- **6.750 Data Penilaian**: Data penilaian untuk 3 periode terakhir (2025-10, 2025-11, 2025-12)
+- **15 Data Validasi**: Data validasi untuk periode 2025-12
+
+## Verifikasi Data di Database
+
+Jalankan query berikut untuk memverifikasi data:
+
+```sql
+-- Jumlah user
+SELECT role, COUNT(*) as jumlah FROM users GROUP BY role;
+
+-- Jumlah kriteria dan subkriteria
+SELECT COUNT(*) as jumlah_kriteria FROM kriteria;
+SELECT COUNT(*) as jumlah_subkriteria FROM subkriteria;
+
+-- Jumlah narapidana
+SELECT COUNT(*) as jumlah_narapidana FROM narapidana;
+
+-- Jumlah penilaian dan validasi
+SELECT periode, COUNT(*) as jumlah FROM penilaian GROUP BY periode;
+SELECT periode, COUNT(*) as jumlah FROM validasi GROUP BY periode;
+
+-- Jumlah edges dan clusters di ANP
+SELECT COUNT(*) as jumlah_edges FROM anp_edges;
+SELECT COUNT(*) as jumlah_clusters FROM anp_clusters;
 ```
 
-### 2. Update Kode dari GitHub
-```bash
-# Masuk ke direktori proyek
-cd /var/www/html/lapas
-
-# Backup file .env
-cp .env .env.backup
-
-# Stash perubahan lokal jika ada
-git stash
-
-# Switch ke branch implementasi-anp
-git fetch origin
-git checkout implementasi-anp
-git pull origin implementasi-anp
-```
-
-### 3. Update Dependencies
-```bash
-# Update composer dependencies
-composer install --no-dev --optimize-autoloader
-```
-
-### 4. Jalankan Migrasi Database
-```bash
-# Jalankan migrasi baru
-php spark migrate
-
-# Jika ada error, coba migrasi spesifik:
-php spark migrate -n App\Database\Migrations -g default
-```
-
-### 5. Update File Environment
-```bash
-# Restore file .env dari backup
-cp .env.backup .env
-
-# Pastikan konfigurasi database benar
-nano .env
-```
-
-### 6. Clear Cache
-```bash
-# Clear cache CodeIgniter
-php spark cache:clear
-
-# Clear opcache jika menggunakan PHP-FPM
-sudo service php8.x-fpm reload
-```
-
-### 7. Update Permission
-```bash
-# Set permission yang benar
-sudo chown -R www-data:www-data /var/www/html/lapas/writable
-sudo chmod -R 755 /var/www/html/lapas/writable
-```
-
-### 8. Restart Web Server
-```bash
-# Restart Apache atau Nginx
-sudo systemctl restart apache2
-# atau
-sudo systemctl restart nginx
-```
+**Expected Output**:
+- Users: 5-6 users dengan berbagai role
+- Kriteria: 6 (atau 4 jika hanya ANP)
+- Subkriteria: 18 (atau 10 jika hanya ANP)
+- Narapidana: 45
+- Penilaian: ~6.750 data
+- Validasi: 15 data
 
 ## Troubleshooting
 
-### 1. Error Migrasi
-Jika ada error migrasi:
+### Error saat migrate:
 ```bash
-# Check status migrasi
-php spark migrate:status
-
-# Rollback migrasi terakhir
+# Rollback dan jalankan ulang migrate
 php spark migrate:rollback
-
-# Jalankan migrasi lagi
 php spark migrate
+
+# Atau migrasi dari awal (hanya jika data tidak penting)
+php spark migrate:refresh
 ```
 
-### 2. Error Route
-Jika ada error route:
+### Error saat seed:
 ```bash
-# Clear routes cache
-rm -f writable/cache/routes*
+# Jalankan seed dengan verbose mode
+php spark db:seed "NamaSeeder" --verbose
 ```
 
-### 3. Error Database
-Jika ada error database:
+### Clear cache jika ada masalah:
 ```bash
-# Restore dari backup
-mysql -u username -p nama_database < backup_file.sql
-```
-
-### 4. Error Permission
-```bash
-sudo chmod -R 755 writable/
-sudo chown -R www-data:www-data writable/
-```
-
-## Testing Setelah Update
-
-### 1. Login sebagai Admin
-- Test menu laporan (dapat melihat hasil TOPSIS)
-- Test cetak laporan (seharusnya konsisten dengan preview)
-
-### 2. Login sebagai Kalapas
-- **Test Validasi** - Buka halaman validasi, pastikan ranking terurut benar
-- **Test Status Remisi** - Periksa apakah status remisi muncul sesuai nilai preferensi
-- **Test Preview Cetak** - Buka preview cetak, pastikan ranking sama dengan halaman validasi
-- **Test Cetak Laporan** - Cetak laporan, pastikan nilai preferensi sama
-
-### 3. Login sebagai Wali
-- Test dashboard dan hasil penilaian
-
-### 4. Login sebagai TPP
-- Test pairwise comparison dan hasil ANP
-
-## Rollback Plan
-Jika ada masalah serius:
-
-```bash
-# Kembali ke branch sebelumnya
-git checkout main
-git pull origin main
-
-# Restore database dari backup
-mysql -u username -p nama_database < backup_file.sql
-
-# Clear cache
 php spark cache:clear
+php spark view:clear
 ```
 
-## Kontak Support
-Jika ada masalah, hubungi:
-- **Developer:** Chaisar Abi
-- **Email:** chaisarabi@email.com
-- **GitHub:** https://github.com/ChaisarAbi/lapas
+## Testing Aplikasi
 
-## Catatan Penting
-1. **Selalu backup database** sebelum update
-2. **Test semua fitur** setelah update
-3. **Monitor error log** setelah deploy
-4. **Informasikan user** tentang perubahan fitur
+Setelah update, buka browser dan test fitur:
 
----
-**Update berhasil jika:**
-- Ranking di halaman validasi, preview cetak, dan cetak laporan **sama**
-- Status remisi muncul dengan benar
-- Tidak ada error di log
-- Semua fitur berfungsi normal
+1. **Login sebagai Admin**:
+   - Username: `admin`
+   - Password: `admin123`
+   - Verifikasi menu Dashboard, Kriteria, Subkriteria, Laporan
 
-## Perbedaan dengan Update Sebelumnya
+2. **Login sebagai TPP**:
+   - Username: `tpp02`
+   - Password: `tpp123`
+   - Verifikasi menu ANP Target First dan Hasil ANP
 
-**Update 3 Februari 2026 (TOPSIS):**
-- Semua perhitungan ranking now use TOPSIS (sebelumnya: mix between simple ranking and TOPSIS)
-- Konsistensi hasil ranking across semua view
-- Perhitungan lebih akurat dan sesuai dengan metode standar
+3. **Login sebagai BIMKEMASWAT**:
+   - Username: `bimkes02`
+   - Password: `bimkes123`
+   - Verifikasi menu Penilaian BIMKEMASWAT
 
-**Update Sebelumnya (1 Februari 2026):**
-- Revisi menu structure dan fitur utama
-- Implementasi pairwise comparison target-first
-- Manajemen user terpisah per role
+4. **Login sebagai Kalapas**:
+   - Username: `kalapas01`
+   - Password: `kalapas123`
+   - Verifikasi menu Validasi dan Laporan
+
+5. **Login sebagai Wali**:
+   - Username: `wali01`
+   - Password: `wali123`
+   - Verifikasi menu Dashboard Wali
+
+Jika semua fitur berfungsi, update berhasil!
