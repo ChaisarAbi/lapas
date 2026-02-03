@@ -440,7 +440,7 @@ class AnpModel extends Model
     }
 
     /**
-     * Upsert pairwise comparison (target-based)
+     * Upsert pairwise comparison (target-based) - OLD VERSION
      */
     public function upsertPairwise($periodeId, $targetId, $fromId, $toId, $value, 
                                    $fromKode = null, $fromNama = null, 
@@ -485,6 +485,175 @@ class AnpModel extends Model
             $db->table('anp_pairwise_histori')->insert($data);
             return 'inserted';
         }
+    }
+
+    /**
+     * Upsert pairwise comparison with canonical pair (NEW VERSION)
+     */
+    public function upsertPairwiseTargetCanonical($periodeId, $targetId, $nodeAId, $nodeBId, $valueNodeAOverNodeB,
+                                                  $nodeAKode = null, $nodeANama = null,
+                                                  $nodeBKode = null, $nodeBNama = null,
+                                                  $targetKode = null, $targetNama = null)
+    {
+        $db = \Config\Database::connect();
+        
+        // Determine canonical order (node1 < node2)
+        $node1Id = min($nodeAId, $nodeBId);
+        $node2Id = max($nodeAId, $nodeBId);
+        
+        // Adjust value based on canonical order
+        if ($nodeAId == $node1Id) {
+            $valueNode1OverNode2 = $valueNodeAOverNodeB;
+        } else {
+            $valueNode1OverNode2 = 1 / $valueNodeAOverNodeB;
+        }
+        
+        // Determine original order for display
+        $nodeDariId = $nodeAId;
+        $nodeKeId = $nodeBId;
+        $skala = $valueNodeAOverNodeB;
+        
+        // Check if canonical pair already exists
+        $existing = $db->table('anp_pairwise_histori')
+            ->where('periode_id', $periodeId)
+            ->where('target_node_id', $targetId)
+            ->where('node1_id', $node1Id)
+            ->where('node2_id', $node2Id)
+            ->get()
+            ->getRowArray();
+        
+        $data = [
+            'periode_id' => $periodeId,
+            'target_node_id' => $targetId,
+            'target_node_kode' => $targetKode,
+            'target_node_nama' => $targetNama,
+            'node_dari_id' => $nodeDariId,
+            'node_dari_kode' => $nodeAKode,
+            'node_dari_nama' => $nodeANama,
+            'node_ke_id' => $nodeKeId,
+            'node_ke_kode' => $nodeBKode,
+            'node_ke_nama' => $nodeBNama,
+            'skala' => $skala,
+            'node1_id' => $node1Id,
+            'node2_id' => $node2Id,
+            'value_node1_over_node2' => $valueNode1OverNode2,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+        
+        if ($existing) {
+            // Update existing canonical pair
+            $db->table('anp_pairwise_histori')
+                ->where('id', $existing['id'])
+                ->update($data);
+            return 'updated';
+        } else {
+            // Insert new canonical pair
+            $data['created_at'] = date('Y-m-d H:i:s');
+            $db->table('anp_pairwise_histori')->insert($data);
+            return 'inserted';
+        }
+    }
+
+    /**
+     * Get canonical pairwise data for target
+     */
+    public function getCanonicalPairwiseByTarget($targetNodeId, $periodeId = null)
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('anp_pairwise_histori')
+            ->where('target_node_id', $targetNodeId)
+            ->where('node1_id IS NOT NULL')
+            ->where('node2_id IS NOT NULL');
+        
+        if ($periodeId) {
+            $builder->where('periode_id', $periodeId);
+        }
+        
+        $builder->orderBy('node1_id', 'ASC')
+                ->orderBy('node2_id', 'ASC');
+        
+        return $builder->get()->getResultArray();
+    }
+
+    /**
+     * Build matrix for specific target node using canonical pairs
+     */
+    public function buildMatrixForTargetCanonical($targetNodeId, $periodeId = null)
+    {
+        $edgeModel = new \App\Models\EdgeModel();
+        $subkriteriaModel = new \App\Models\SubkriteriaModel();
+        
+        // Get influencer nodes for this target
+        $influencers = $edgeModel->getInfluencerNodes($targetNodeId, $periodeId);
+        
+        if (empty($influencers)) {
+            return [
+                'influencers' => [],
+                'matrix' => [],
+                'filled_pairs' => 0,
+                'total_pairs' => 0,
+                'progress_percentage' => 0,
+                'is_complete' => false
+            ];
+        }
+        
+        // Get canonical pairwise data for this target
+        $pairwiseData = $this->getCanonicalPairwiseByTarget($targetNodeId, $periodeId);
+        
+        // Create mapping for quick lookup
+        $pairwiseMap = [];
+        foreach ($pairwiseData as $pair) {
+            $key = $pair['node1_id'] . '_' . $pair['node2_id'];
+            $pairwiseMap[$key] = (float)$pair['value_node1_over_node2'];
+        }
+        
+        // Build matrix
+        $k = count($influencers);
+        $matrix = array_fill(0, $k, array_fill(0, $k, 0.0));
+        
+        // Fill matrix
+        $filledPairs = 0;
+        for ($i = 0; $i < $k; $i++) {
+            for ($j = 0; $j < $k; $j++) {
+                if ($i == $j) {
+                    // Diagonal = 1
+                    $matrix[$i][$j] = 1.0;
+                } else {
+                    $nodeI = $influencers[$i]['id'];
+                    $nodeJ = $influencers[$j]['id'];
+                    
+                    // Determine canonical order
+                    $node1 = min($nodeI, $nodeJ);
+                    $node2 = max($nodeI, $nodeJ);
+                    $key = $node1 . '_' . $node2;
+                    
+                    if (isset($pairwiseMap[$key])) {
+                        $value = $pairwiseMap[$key];
+                        // Apply value based on order
+                        if ($nodeI == $node1) {
+                            $matrix[$i][$j] = $value; // nodeI is node1
+                        } else {
+                            $matrix[$i][$j] = 1 / $value; // nodeI is node2, reciprocal
+                        }
+                        $filledPairs++;
+                    }
+                }
+            }
+        }
+        
+        // Calculate progress
+        $totalPairs = $k * ($k - 1) / 2; // Unique pairs (upper triangle)
+        $progressPercentage = $totalPairs > 0 ? ($filledPairs / $totalPairs) * 100 : 0;
+        $isComplete = ($filledPairs == $totalPairs);
+        
+        return [
+            'influencers' => $influencers,
+            'matrix' => $matrix,
+            'filled_pairs' => $filledPairs,
+            'total_pairs' => $totalPairs,
+            'progress_percentage' => $progressPercentage,
+            'is_complete' => $isComplete
+        ];
     }
 
     /**

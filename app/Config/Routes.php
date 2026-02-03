@@ -90,7 +90,7 @@ $routes->group('tpp', ['filter' => 'role:TPP'], function($routes) {
     $routes->post('anp/simpan-bobot-akhir', 'TppAnpController::simpanBobotAkhir');
     $routes->get('anp/pairwise-comparison', 'TppAnpController::pairwiseComparison');
     $routes->post('anp/simpan-pairwise', 'TppAnpController::simpanPairwise');
-    $routes->post('anp/hitung-anp-target-first', 'TppAnpController::hitungAnpTargetFirst');
+    $routes->get('anp/hitung-anp-target-first', 'TppAnpController::hitungAnpTargetFirst'); // Changed from POST to GET
     $routes->post('anp/hapus-pairwise/(:num)', 'TppAnpController::hapusPairwise/$1');
     $routes->post('anp/hitung-anp', 'TppAnpController::hitungAnp');
     $routes->post('anp/auto-fill-pairwise', 'TppAnpController::autoFillPairwise');
@@ -100,10 +100,10 @@ $routes->group('tpp', ['filter' => 'role:TPP'], function($routes) {
     // Pairwise Comparison Target-First
     $routes->get('anp/pairwise-target', 'TppAnpController::pairwiseTarget');
     $routes->post('anp/simpan-pairwise-target', 'TppAnpController::simpanPairwiseTarget');
+    $routes->get('anp/edges', 'TppAnpController::edges');
     $routes->post('anp/simpan-edges', 'TppAnpController::simpanEdges');
     $routes->post('anp/auto-fill-pairwise-target', 'TppAnpController::autoFillPairwiseTarget');
     $routes->get('anp/render-result-tables', 'TppAnpController::renderResultTables');
-    $routes->post('anp/hitung-anp-target-first', 'TppAnpController::hitungAnpTargetFirst');
     // Route cetak ANP dihapus karena file view tidak ada
     
     // Periode Penilaian - DIPINDAH ke Admin

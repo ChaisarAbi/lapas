@@ -33,7 +33,8 @@ class RankingController extends BaseController
                 'dashboard_url' => $role == 'WALI_PEMASYARAKATAN' ? 'wali/dashboard' : 'kalapas/dashboard',
                 'error' => 'Tidak ada data penilaian untuk periode ' . $periode,
                 'periode' => $periode,
-                'periode_list' => $this->penilaianModel->getPeriodeForDropdown()
+                'periode_list' => $this->penilaianModel->getPeriodeForDropdown(),
+                'role' => $role
             ];
             
             return view('ranking/index', $data);
@@ -348,6 +349,8 @@ class RankingController extends BaseController
             $hasil[] = [
                 'narapidana' => $napi,
                 'preferensi' => $preferensi,
+                'd_positif' => 0, // Default value
+                'd_negatif' => 0, // Default value
                 'row' => $row // Simpan row untuk perhitungan jarak
             ];
         }
@@ -395,12 +398,6 @@ class RankingController extends BaseController
                 
                 // Hapus row karena tidak diperlukan lagi
                 unset($hasil[$i]['row']);
-            }
-        } else {
-            // Jika tidak ada data, set D+ dan D- ke 0
-            foreach ($hasil as &$item) {
-                $item['d_positif'] = 0;
-                $item['d_negatif'] = 0;
             }
         }
         

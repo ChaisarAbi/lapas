@@ -24,6 +24,61 @@ class TppAnpController extends BaseController
     }
 
     /**
+     * Halaman kelola edges (panah ANP)
+     */
+    public function edges()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        $periodeId = $periodeAktif ? $periodeAktif['id'] : null;
+        
+        if (!$periodeAktif) {
+            return redirect()->back()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        // Ambil semua subkriteria untuk dropdown dan checkbox
+        $subkriteria = $this->subkriteriaModel->getWithKriteria();
+        
+        // Ambil from node yang dipilih dari query string
+        $selectedFromId = $this->request->getGet('from_node_id');
+        $selectedFrom = null;
+        $existingEdges = [];
+        $allToNodes = [];
+        
+        if ($selectedFromId) {
+            // Cari from node yang dipilih
+            foreach ($subkriteria as $node) {
+                if ($node['id'] == $selectedFromId) {
+                    $selectedFrom = $node;
+                    break;
+                }
+            }
+            
+            // Ambil edges existing untuk from node ini
+            $edgeModel = new EdgeModel();
+            $existingEdges = $edgeModel->getToNodes($selectedFromId, $periodeId);
+            
+            // Buat list to nodes (semua subkriteria kecuali from node itu sendiri)
+            $allToNodes = array_filter($subkriteria, function($node) use ($selectedFromId) {
+                return $node['id'] != $selectedFromId;
+            });
+            $allToNodes = array_values($allToNodes); // Reset indices
+        }
+        
+        $data = [
+            'title' => 'Kelola Edges ANP - SPK Pembinaan',
+            'subkriteria' => $subkriteria,
+            'selected_from' => $selectedFrom,
+            'existing_edges' => $existingEdges,
+            'all_to_nodes' => $allToNodes,
+            'periode' => $periodeAktif,
+            'activeMenu' => 'edges'
+        ];
+        
+        return view('tpp_anp/edges', $data);
+    }
+
+    /**
      * Pairwise comparison dengan target-first approach
      */
     public function pairwiseTarget()
@@ -54,8 +109,8 @@ class TppAnpController extends BaseController
             }
             
         if ($selectedTarget) {
-            // Bangun matrix untuk target ini - semua subkriteria lain adalah influencer
-            $matrixData = $this->buildMatrixForTargetNoEdges($selectedTargetId, $periodeId, $subkriteria);
+            // Bangun matrix untuk target ini menggunakan edges
+            $matrixData = $this->buildMatrixForTargetWithEdges($selectedTargetId, $periodeId, $subkriteria);
             
             // Hitung apakah matrix sudah lengkap
             if ($matrixData && !empty($matrixData['influencers'])) {
@@ -73,7 +128,16 @@ class TppAnpController extends BaseController
                 
                 // Hitung AHP report hanya jika matrix sudah lengkap
                 if ($isComplete && !empty($matrixData['matrix'])) {
-                    $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+                    try {
+                        $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+                        if (!$ahpReport) {
+                            log_message('error', 'calculateAhpReport mengembalikan null untuk target ID: ' . $selectedTargetId);
+                            $ahpReport = null;
+                        }
+                    } catch (\Exception $e) {
+                        log_message('error', 'Error calculateAhpReport untuk target ID ' . $selectedTargetId . ': ' . $e->getMessage());
+                        $ahpReport = null;
+                    }
                 } else {
                     $ahpReport = null;
                 }
@@ -100,16 +164,35 @@ class TppAnpController extends BaseController
     }
     
     /**
-     * Bangun matrix untuk target tanpa menggunakan edges
-     * Semua subkriteria lain adalah influencer
+     * Bangun matrix untuk target menggunakan edges
+     * Hanya subkriteria yang memiliki edge ke target yang menjadi influencer
      */
-    private function buildMatrixForTargetNoEdges($targetId, $periodeId, $allSubkriteria)
+    private function buildMatrixForTargetWithEdges($targetId, $periodeId, $allSubkriteria)
     {
-        // Filter influencer: semua subkriteria kecuali target itu sendiri
-        $influencers = array_filter($allSubkriteria, function($sub) use ($targetId) {
-            return $sub['id'] != $targetId;
-        });
-        $influencers = array_values($influencers); // Reset indices
+        // Gunakan EdgeModel untuk mendapatkan influencer nodes (from_node -> target)
+        $edgeModel = new EdgeModel();
+        $influencerEdges = $edgeModel->getInfluencerNodes($targetId, $periodeId);
+        
+        if (empty($influencerEdges)) {
+            // Jika tidak ada edges, kembalikan null atau array kosong
+            return null;
+        }
+        
+        // Ekstrak influencer nodes dari edges
+        $influencers = [];
+        $idToIndex = [];
+        $index = 0;
+        foreach ($influencerEdges as $edge) {
+            // Pastikan node influencer ada dalam daftar allSubkriteria
+            foreach ($allSubkriteria as $sub) {
+                if ($sub['id'] == $edge['id']) {
+                    $influencers[] = $sub;
+                    $idToIndex[$sub['id']] = $index;
+                    $index++;
+                    break;
+                }
+            }
+        }
         
         if (empty($influencers)) {
             return null;
@@ -126,12 +209,6 @@ class TppAnpController extends BaseController
             ->where('periode_id', $periodeId)
             ->get()
             ->getResultArray();
-        
-        // Mapping influencer ID ke index
-        $idToIndex = [];
-        foreach ($influencers as $index => $inf) {
-            $idToIndex[$inf['id']] = $index;
-        }
         
         // Isi matrix dari data pairwise
         foreach ($pairwiseData as $pairwise) {
@@ -173,7 +250,7 @@ class TppAnpController extends BaseController
     }
 
     /**
-     * Simpan pairwise untuk target tertentu (server-rendered)
+     * Simpan pairwise untuk target tertentu (server-rendered) - menggunakan metode canonical
      */
     public function simpanPairwiseTarget()
     {
@@ -214,8 +291,8 @@ class TppAnpController extends BaseController
             return redirect()->back()->withInput()->with('error', 'Data subkriteria tidak ditemukan.');
         }
 
-        // Simpan pairwise
-        $result = $this->anpModel->upsertPairwise(
+        // Simpan pairwise menggunakan metode canonical
+        $result = $this->anpModel->upsertPairwiseTargetCanonical(
             $periodeId,
             $targetId,
             $fromId,
@@ -232,49 +309,6 @@ class TppAnpController extends BaseController
         $message = ($result === 'updated') ? 'Pairwise berhasil diperbarui.' : 'Pairwise berhasil ditambahkan.';
 
         return redirect()->to('/tpp/anp/pairwise-target?target_id=' . $targetId)->with('success', $message);
-    }
-
-    /**
-     * Simpan edges (panah ANP)
-     */
-    public function simpanEdges()
-    {
-        // Ambil periode aktif
-        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
-        if (!$periodeAktif) {
-            return redirect()->back()->withInput()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
-        }
-        
-        $periodeId = $periodeAktif['id'];
-        
-        // Ambil data dari POST
-        $edges = $this->request->getPost('edges');
-        
-        if (empty($edges)) {
-            return redirect()->back()->withInput()->with('error', 'Tidak ada edges yang dikirim.');
-        }
-        
-        // Parse edges data
-        $edgesData = [];
-        foreach ($edges as $edge) {
-            $parts = explode('_', $edge);
-            if (count($parts) === 2) {
-                $edgesData[] = [
-                    'from_node_id' => $parts[0],
-                    'to_node_id' => $parts[1]
-                ];
-            }
-        }
-        
-        // Simpan edges
-        $edgeModel = new EdgeModel();
-        $saved = $edgeModel->saveEdges($edgesData, $periodeId);
-        
-        if ($saved > 0) {
-            return redirect()->to('/tpp/anp/pairwise-target')->with('success', "Edges berhasil disimpan ($saved data)");
-        } else {
-            return redirect()->back()->withInput()->with('error', 'Gagal menyimpan edges.');
-        }
     }
 
     /**
@@ -302,10 +336,27 @@ class TppAnpController extends BaseController
             return redirect()->back()->with('error', 'Target tidak ditemukan.');
         }
 
-        $all = $this->subkriteriaModel->getWithKriteria();
-        $influencers = array_values(array_filter($all, function($s) use ($targetId) {
-            return $s['id'] != $targetId;
-        }));
+        // Gunakan EdgeModel untuk mendapatkan influencer nodes yang memiliki edge ke target
+        $edgeModel = new EdgeModel();
+        $influencerEdges = $edgeModel->getInfluencerNodes($targetId, $periodeId);
+        
+        if (empty($influencerEdges)) {
+            return redirect()->back()->with('error', 'Tidak ada influencer untuk target ini. Silakan kelola edges terlebih dahulu.');
+        }
+        
+        // Ekstrak influencer nodes dari edges
+        $allSubkriteria = $this->subkriteriaModel->getWithKriteria();
+        $influencers = [];
+        foreach ($influencerEdges as $edge) {
+            // Pastikan node influencer ada dalam daftar allSubkriteria
+            foreach ($allSubkriteria as $sub) {
+                if ($sub['id'] == $edge['id']) {
+                    $influencers[] = $sub;
+                    break;
+                }
+            }
+        }
+        
         if (count($influencers) < 2) {
             return redirect()->back()->with('error', 'Influencer kurang dari 2, tidak bisa dibuat pairwise.');
         }
@@ -388,13 +439,14 @@ class TppAnpController extends BaseController
             for ($i = 0; $i < $n; $i++) $W[$i][$i] = 1.0;
 
             $completeTargetCount = 0;
+            $calculationResults = [];
 
             // Loop tiap node sebagai TARGET
             foreach ($subkriteria as $tIndex => $target) {
                 $targetId = $target['id'];
 
-                // build matrix (influencers = semua node kecuali target)
-                $matrixData = $this->buildMatrixForTargetNoEdges($targetId, $periodeId, $subkriteria);
+                // build matrix menggunakan edges
+                $matrixData = $this->buildMatrixForTargetWithEdges($targetId, $periodeId, $subkriteria);
                 if (!$matrixData || empty($matrixData['influencers'])) {
                     continue;
                 }
@@ -413,6 +465,14 @@ class TppAnpController extends BaseController
                 // hitung bobot influencer terhadap target
                 $ahp = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
                 if (!$ahp || empty($ahp['weights'])) continue;
+
+            // Simpan hasil perhitungan untuk target ini
+                $calculationResults[$targetId] = [
+                    'target' => $target,
+                    'ahp_report' => $ahp,
+                    'influencers' => $matrixData['influencers'],
+                    'matrix' => $matrixData['matrix'] // Tambahkan matrix node-node
+                ];
 
                 foreach ($matrixData['influencers'] as $infIdx => $inf) {
                     $iIndex = $idToIndex[$inf['id']] ?? null;
@@ -449,7 +509,85 @@ class TppAnpController extends BaseController
             $saved = $this->anpModel->saveMatrix($interdependensiData, $periodeId);
 
             $msg = "Hitung ANP (Target-First) berhasil. Interdependensi tersimpan ($saved records).";
-            return redirect()->to('/tpp/anp')->with('success', $msg);
+            
+            // Bangun supermatrix dari interdependensi
+            $clusters = $this->getClusters();
+            $supermatrix = $this->anpModel->buildSupermatrix($subkriteria, $interdependensiData, $clusters);
+            
+            // Hitung hasil ANP lengkap
+            $hasilAnp = $this->hitungANPLengkap($supermatrix, $subkriteria);
+            
+            // Ambil target yang dipilih dari query string
+            $selectedTargetId = $this->request->getGet('target_id');
+            $selectedTarget = null;
+            $matrixData = null;
+            $ahpReport = null;
+            
+            if ($selectedTargetId) {
+                // Cari target yang dipilih
+                foreach ($subkriteria as $target) {
+                    if ($target['id'] == $selectedTargetId) {
+                        $selectedTarget = $target;
+                        break;
+                    }
+                }
+                
+                if ($selectedTarget) {
+                    // Bangun matrix untuk target ini menggunakan edges
+                    $matrixData = $this->buildMatrixForTargetWithEdges($selectedTargetId, $periodeId, $subkriteria);
+                    
+                    // Hitung apakah matrix sudah lengkap
+                    if ($matrixData && !empty($matrixData['influencers'])) {
+                        $k = count($matrixData['influencers']);
+                        $totalPairs = $k * ($k - 1) / 2; // Unique pairs (upper triangle)
+                        $filledPairs = $matrixData['filled_pairs'];
+                        $isComplete = ($filledPairs >= $totalPairs && $k >= 2);
+                        
+                        // Tambahkan data completeness ke matrixData
+                        $matrixData['is_complete'] = $isComplete;
+                        $matrixData['k'] = $k;
+                        $matrixData['total_pairs'] = $totalPairs;
+                        $matrixData['filled_pairs'] = $filledPairs;
+                        $matrixData['progress_percentage'] = $totalPairs > 0 ? round(($filledPairs / $totalPairs) * 100, 1) : 0;
+                        
+                        // Hitung AHP report hanya jika matrix sudah lengkap
+                        if ($isComplete && !empty($matrixData['matrix'])) {
+                            try {
+                                $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+                                if (!$ahpReport) {
+                                    log_message('error', 'calculateAhpReport mengembalikan null untuk target ID: ' . $selectedTargetId);
+                                    $ahpReport = null;
+                                }
+                            } catch (\Exception $e) {
+                                log_message('error', 'Error calculateAhpReport untuk target ID ' . $selectedTargetId . ': ' . $e->getMessage());
+                                $ahpReport = null;
+                            }
+                        } else {
+                            $ahpReport = null;
+                        }
+                    } else {
+                        $ahpReport = null;
+                    }
+                } else {
+                    $ahpReport = null;
+                }
+            }
+            
+            $data = [
+                'title' => 'Pairwise Comparison ANP (Target-First) - SPK Pembinaan',
+                'subkriteria' => $subkriteria,
+                'targets' => $subkriteria,
+                'selected_target' => $selectedTarget,
+                'matrix_data' => $matrixData,
+                'ahp_report' => $ahpReport ?? null,
+                'calculation_results' => $calculationResults,
+                'hasil_anp' => $hasilAnp,
+                'periode' => $periodeAktif,
+                'activeMenu' => 'pairwise-target',
+                'success_message' => $msg
+            ];
+            
+            return view('tpp_anp/pairwise_target', $data);
 
         } catch (\Throwable $e) {
             $msg = 'Error hitung ANP Target-First: ' . $e->getMessage();
@@ -1469,8 +1607,8 @@ class TppAnpController extends BaseController
 
     $allSubkriteria = $this->subkriteriaModel->getWithKriteria();
 
-    // ✅ PAKAI NO-EDGES
-    $matrixData = $this->buildMatrixForTargetNoEdges($targetId, $periodeId, $allSubkriteria);
+    // ✅ PAKAI WITH-EDGES (sesuai konsep target-first)
+    $matrixData = $this->buildMatrixForTargetWithEdges($targetId, $periodeId, $allSubkriteria);
 
     if (!$matrixData || empty($matrixData['influencers'])) {
         return $this->response->setJSON(['success' => false, 'message' => 'Tidak ada influencer untuk target ini']);
@@ -1504,5 +1642,44 @@ class TppAnpController extends BaseController
         'total_pairs' => $totalPairs
     ]);
 }
+
+    /**
+     * Simpan edges untuk from node tertentu
+     */
+    public function simpanEdges()
+    {
+        // Ambil periode aktif
+        $periodeAktif = $this->periodeModel->where('status', 'aktif')->first();
+        if (!$periodeAktif) {
+            return redirect()->back()->with('error', 'Tidak ada periode aktif. Silakan buat periode terlebih dahulu.');
+        }
+        
+        $periodeId = $periodeAktif['id'];
+        
+        // Ambil data dari POST
+        $fromNodeId = $this->request->getPost('from_node_id');
+        $toNodeIds = $this->request->getPost('to_node_ids') ?? [];
+        
+        // Validasi
+        if (!$fromNodeId) {
+            return redirect()->back()->with('error', 'From node harus dipilih.');
+        }
+        
+        // Cek apakah from node valid
+        $fromNode = $this->subkriteriaModel->find($fromNodeId);
+        if (!$fromNode) {
+            return redirect()->back()->with('error', 'From node tidak valid.');
+        }
+        
+        // Simpan edges menggunakan EdgeModel
+        $edgeModel = new EdgeModel();
+        $saved = $edgeModel->saveEdgesForFromNode($fromNodeId, $toNodeIds, $periodeId);
+        
+        if ($saved >= 0) {
+            return redirect()->to('/tpp/anp/edges?from_node_id=' . $fromNodeId)->with('success', "Edges berhasil disimpan. ($saved edges tersimpan)");
+        } else {
+            return redirect()->back()->with('error', 'Gagal menyimpan edges.');
+        }
+    }
 
 }

@@ -57,8 +57,6 @@ $activeMenu = 'validasi';
                                             <th width="10%">Nomor Registrasi</th>
                                             <th width="15%">Jenis Kejahatan</th>
                                             <th width="10%">Nilai Preferensi</th>
-                                            <th width="10%">Status</th>
-                                            <th width="15%">Status Remisi</th>
                                             <th width="15%">Validasi</th>
                                         </tr>
                                     </thead>
@@ -74,37 +72,18 @@ $activeMenu = 'validasi';
                                             <td><?= $item['narapidana']['nomor_registrasi'] ?></td>
                                             <td><?= $item['narapidana']['kasus'] ?? $item['narapidana']['jenis_kasus'] ?? $item['narapidana']['jenis_kejahatan'] ?? '-' ?></td>
                                             <td>
-                                                <span class="badge badge-<?= $item['preferensi'] >= 0.7 ? 'success' : ($item['preferensi'] >= 0.5 ? 'warning' : 'danger') ?>">
-                                                    <?= number_format($item['preferensi'], 4) ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <?php if ($item['preferensi'] >= 0.7): ?>
-                                                    <span class="badge badge-success">Baik</span>
-                                                <?php elseif ($item['preferensi'] >= 0.5): ?>
-                                                    <span class="badge badge-warning">Cukup</span>
-                                                <?php else: ?>
-                                                    <span class="badge badge-danger">Perlu Perhatian</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
                                                 <?php
-                                                // Tentukan status remisi berdasarkan nilai preferensi (Ci)
-                                                // Kriteria baru: ≥0.85 Remisi Penuh, ≥0.75 Remisi Separuh, <0.75 Tidak Layak Remisi
-                                                $statusRemisi = '';
-                                                $badgeClass = '';
+                                                // Tentukan warna berdasarkan status remisi
+                                                $badgeClass = 'badge-danger'; // Default: Tidak Layak Remisi
                                                 if ($item['preferensi'] >= 0.85) {
-                                                    $statusRemisi = 'Remisi Penuh';
-                                                    $badgeClass = 'badge-success';
+                                                    $badgeClass = 'badge-success'; // Remisi Penuh
                                                 } elseif ($item['preferensi'] >= 0.75) {
-                                                    $statusRemisi = 'Remisi Separuh';
-                                                    $badgeClass = 'badge-warning';
-                                                } else {
-                                                    $statusRemisi = 'Tidak Layak Remisi';
-                                                    $badgeClass = 'badge-danger';
+                                                    $badgeClass = 'badge-warning'; // Remisi Separuh
                                                 }
                                                 ?>
-                                                <span class="badge <?= $badgeClass ?>"><?= $statusRemisi ?></span>
+                                                <span class="badge <?= $badgeClass ?>">
+                                                    <?= number_format($item['preferensi'], 4) ?>
+                                                </span>
                                             </td>
                                             <td>
                                                 <select name="validasi[<?= $item['narapidana']['id'] ?>]" class="form-control form-control-sm">

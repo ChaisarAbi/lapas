@@ -110,7 +110,55 @@ class EdgeModel extends Model
     }
 
     /**
-     * Get influencer nodes for target (with node details)
+     * Get to nodes for a specific from node
+     */
+    public function getToNodes($fromNodeId, $periodeId = null)
+    {
+        $builder = $this->where('from_node_id', $fromNodeId);
+        
+        if ($periodeId) {
+            $builder->where('periode_id', $periodeId);
+        }
+        
+        return $builder->findAll();
+    }
+
+    /**
+     * Save edges for a specific from node (batch upsert)
+     */
+    public function saveEdgesForFromNode($fromNodeId, $toNodeIds, $periodeId = null)
+    {
+        // Hapus edges lama untuk from_node ini di periode aktif
+        $deleteBuilder = $this->where('from_node_id', $fromNodeId);
+        if ($periodeId) {
+            $deleteBuilder->where('periode_id', $periodeId);
+        }
+        $deleteBuilder->delete();
+
+        // Simpan edges baru
+        $saved = 0;
+        foreach ($toNodeIds as $toNodeId) {
+            // Skip jika from_node sama dengan to_node
+            if ($fromNodeId == $toNodeId) {
+                continue;
+            }
+            
+            $edgeData = [
+                'periode_id' => $periodeId,
+                'from_node_id' => $fromNodeId,
+                'to_node_id' => $toNodeId
+            ];
+            
+            if ($this->save($edgeData)) {
+                $saved++;
+            }
+        }
+
+        return $saved;
+    }
+
+    /**
+     * Get influencer nodes for target (with node details) - optimized
      */
     public function getInfluencerNodes($targetNodeId, $periodeId = null)
     {

@@ -66,6 +66,13 @@ $activeMenu = $activeMenu ?? 'dashboard';
                 </li>
                 
                 <li class="nav-item">
+                    <a href="<?= base_url('tpp/anp/edges') ?>" class="nav-link <?= $activeMenu == 'edges' ? 'active' : '' ?>">
+                        <i class="nav-icon fas fa-arrow-right"></i>
+                        <p>Kelola Edges</p>
+                    </a>
+                </li>
+                
+                <li class="nav-item">
                     <a href="<?= base_url('tpp/anp/pairwise-comparison') ?>" class="nav-link <?= $activeMenu == 'pairwise-comparison' ? 'active' : '' ?>">
                         <i class="nav-icon fas fa-project-diagram"></i>
                         <p>Pairwise (Legacy)</p>

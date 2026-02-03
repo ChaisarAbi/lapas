@@ -128,13 +128,16 @@
                 <td class="text-center"><?= number_format($item['d_positif'], 4) ?></td>
                 <td class="text-center"><?= number_format($item['d_negatif'], 4) ?></td>
                 <td class="text-center">
-                    <?php if ($item['preferensi'] >= 0.7): ?>
-                        <span class="badge badge-success"><?= number_format($item['preferensi'], 4) ?></span>
-                    <?php elseif ($item['preferensi'] >= 0.5): ?>
-                        <span class="badge badge-warning"><?= number_format($item['preferensi'], 4) ?></span>
-                    <?php else: ?>
-                        <span class="badge badge-danger"><?= number_format($item['preferensi'], 4) ?></span>
-                    <?php endif; ?>
+                    <?php
+                    // Tentukan warna berdasarkan status remisi
+                    $badgeClass = 'badge-danger'; // Default: Tidak Layak Remisi
+                    if ($item['preferensi'] >= 0.85) {
+                        $badgeClass = 'badge-success'; // Remisi Penuh
+                    } elseif ($item['preferensi'] >= 0.75) {
+                        $badgeClass = 'badge-warning'; // Remisi Separuh
+                    }
+                    ?>
+                    <span class="badge <?= $badgeClass ?>"><?= number_format($item['preferensi'], 4) ?></span>
                 </td>
             </tr>
             <?php endforeach; ?>

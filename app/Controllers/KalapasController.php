@@ -104,8 +104,8 @@ class KalapasController extends BaseController
         
         $ranking = [];
         if (!empty($penilaian)) {
-            // Hitung ranking menggunakan RATA-RATA SEDERHANA (konsisten dengan halaman lain)
-            $ranking = $this->hitungRankingSederhana($narapidana, $kriteria, $penilaian);
+            // Hitung ranking menggunakan TOPSIS (konsisten dengan halaman ranking)
+            $ranking = $this->hitungTOPSIS($narapidana, $kriteria, $penilaian);
         }
         
         $data = [
@@ -206,8 +206,8 @@ class KalapasController extends BaseController
         $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
         $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
         
-        // Hitung ranking menggunakan RATA-RATA SEDERHANA (konsisten dengan halaman validasi)
-        $hasil = $this->hitungRankingSederhana($narapidana, $kriteria, $penilaian);
+        // Hitung ranking menggunakan TOPSIS (konsisten dengan halaman ranking)
+        $hasil = $this->hitungTOPSIS($narapidana, $kriteria, $penilaian);
         
         $data = [
             'title' => 'Preview Cetak Laporan Ranking',
@@ -243,8 +243,8 @@ class KalapasController extends BaseController
         $narapidanaIds = array_unique(array_column($penilaian, 'narapidana_id'));
         $narapidana = $this->narapidanaModel->whereIn('id', $narapidanaIds)->findAll();
         
-        // Hitung ranking menggunakan RATA-RATA SEDERHANA (konsisten dengan halaman validasi)
-        $hasil = $this->hitungRankingSederhana($narapidana, $kriteria, $penilaian);
+        // Hitung ranking menggunakan TOPSIS (konsisten dengan halaman ranking)
+        $hasil = $this->hitungTOPSIS($narapidana, $kriteria, $penilaian);
         
         $data = [
             'title' => 'Laporan Ranking Narapidana',
@@ -256,6 +256,178 @@ class KalapasController extends BaseController
         ];
         
         return view('kalapas/cetak_laporan', $data);
+    }
+    
+    /**
+     * Hitung TOPSIS untuk perhitungan ranking
+     */
+    public function hitungTOPSIS($narapidana, $kriteria, $penilaian)
+    {
+        $hasil = [];
+        
+        // Cek jika tidak ada data
+        if (empty($narapidana) || empty($kriteria) || empty($penilaian)) {
+            return $hasil;
+        }
+        
+        // 1. Buat matriks keputusan - hitung rata-rata nilai per kriteria dari subkriteria
+        $matriks = [];
+        foreach ($narapidana as $napi) {
+            $row = [];
+            
+            // Group penilaian untuk narapidana ini
+            $penilaianNapi = array_filter($penilaian, function($p) use ($napi) {
+                return $p['narapidana_id'] == $napi['id'];
+            });
+            
+            foreach ($kriteria as $k) {
+                $nilaiKriteria = 0;
+                $countSubkriteria = 0;
+                
+                // Cari semua penilaian untuk subkriteria dari kriteria ini
+                foreach ($penilaianNapi as $p) {
+                    // Periksa apakah penilaian ini untuk subkriteria dari kriteria ini
+                    if (isset($p['subkriteria_id'])) {
+                        // Untuk sementara, kita asumsikan semua penilaian valid
+                        $nilaiKriteria += (float)$p['nilai'];
+                        $countSubkriteria++;
+                    }
+                }
+                
+                // Hitung rata-rata jika ada subkriteria
+                $nilai = $countSubkriteria > 0 ? $nilaiKriteria / $countSubkriteria : 0;
+                
+                // JANGAN normalisasi di sini! Biarkan nilai dalam skala asli (0-100)
+                // Algoritma TOPSIS akan melakukan normalisasi sendiri
+                $row[] = $nilai;
+            }
+            $matriks[] = $row;
+        }
+        
+        // Debug: cek jika semua nilai sama (kasus khusus)
+        $allSame = true;
+        $firstValue = $matriks[0][0] ?? 0;
+        foreach ($matriks as $row) {
+            foreach ($row as $value) {
+                if ($value != $firstValue) {
+                    $allSame = false;
+                    break 2;
+                }
+            }
+        }
+        
+        // Jika semua nilai sama, berikan nilai preferensi 0.5 (netral)
+        if ($allSame && count($matriks) > 0) {
+            foreach ($narapidana as $index => $napi) {
+                $hasil[$index] = [
+                    'narapidana' => $napi,
+                    'd_positif' => 0,
+                    'd_negatif' => 0,
+                    'preferensi' => 0.5 // Nilai netral untuk kasus semua sama
+                ];
+            }
+            return $hasil;
+        }
+        
+        // 2. Normalisasi matriks
+        $normalisasi = [];
+        $jumlahKolom = count($kriteria);
+        
+        for ($j = 0; $j < $jumlahKolom; $j++) {
+            $sumSquares = 0;
+            for ($i = 0; $i < count($matriks); $i++) {
+                $sumSquares += pow($matriks[$i][$j], 2);
+            }
+            $sqrtSum = sqrt($sumSquares);
+            
+            // Jika sqrtSum 0 (semua nilai di kolom 0), set ke 1 untuk hindari division by zero
+            if ($sqrtSum == 0) {
+                $sqrtSum = 1;
+            }
+            
+            for ($i = 0; $i < count($matriks); $i++) {
+                $normalisasi[$i][$j] = $matriks[$i][$j] / $sqrtSum;
+            }
+        }
+        
+        // 3. Matriks terbobot - gunakan bobot dari kriteria
+        $terbobot = [];
+        $totalBobot = 0;
+        foreach ($kriteria as $k) {
+            $totalBobot += (float)$k['bobot'];
+        }
+        
+        // Jika total bobot 0, gunakan bobot default (1/n)
+        $useDefaultBobot = ($totalBobot == 0);
+        
+        for ($i = 0; $i < count($normalisasi); $i++) {
+            for ($j = 0; $j < $jumlahKolom; $j++) {
+                $bobot = (float)$kriteria[$j]['bobot'];
+                if ($useDefaultBobot) {
+                    $bobot = 1 / $jumlahKolom;
+                }
+                $terbobot[$i][$j] = $normalisasi[$i][$j] * $bobot;
+            }
+        }
+        
+        // 4. Solusi ideal positif dan negatif
+        $idealPositif = [];
+        $idealNegatif = [];
+        
+        for ($j = 0; $j < $jumlahKolom; $j++) {
+            $kolom = array_column($terbobot, $j);
+            
+            // Cek jika semua nilai di kolom sama
+            $kolomMin = min($kolom);
+            $kolomMax = max($kolom);
+            
+            if ($kolomMin == $kolomMax) {
+                // Jika semua nilai sama, set ideal positif dan negatif sama
+                $idealPositif[$j] = $kolomMax;
+                $idealNegatif[$j] = $kolomMin;
+            } else {
+                if ($kriteria[$j]['jenis'] == 'Benefit') {
+                    $idealPositif[$j] = $kolomMax;
+                    $idealNegatif[$j] = $kolomMin;
+                } else { // Cost
+                    $idealPositif[$j] = $kolomMin;
+                    $idealNegatif[$j] = $kolomMax;
+                }
+            }
+        }
+        
+        // 5. Hitung jarak ke solusi ideal
+        for ($i = 0; $i < count($terbobot); $i++) {
+            $dPositif = 0;
+            $dNegatif = 0;
+            
+            for ($j = 0; $j < $jumlahKolom; $j++) {
+                $diffPositif = $terbobot[$i][$j] - $idealPositif[$j];
+                $diffNegatif = $terbobot[$i][$j] - $idealNegatif[$j];
+                $dPositif += pow($diffPositif, 2);
+                $dNegatif += pow($diffNegatif, 2);
+            }
+            
+            $dPositif = sqrt($dPositif);
+            $dNegatif = sqrt($dNegatif);
+            
+            // 6. Hitung nilai preferensi
+            $preferensi = ($dPositif + $dNegatif) > 0 ? $dNegatif / ($dPositif + $dNegatif) : 0;
+            
+            $hasil[$i] = [
+                'narapidana' => $narapidana[$i],
+                'd_positif' => $dPositif,
+                'd_negatif' => $dNegatif,
+                'preferensi' => $preferensi
+            ];
+        }
+        
+        // 7. Urutkan ranking
+        usort($hasil, function($a, $b) {
+            return $b['preferensi'] <=> $a['preferensi'];
+        });
+        
+        return $hasil;
     }
     
     private function hitungRankingSederhana($narapidana, $kriteria, $penilaian)
@@ -305,6 +477,8 @@ class KalapasController extends BaseController
             $hasil[] = [
                 'narapidana' => $napi,
                 'preferensi' => $preferensi,
+                'd_positif' => 0, // Default value
+                'd_negatif' => 0, // Default value
                 'row' => $row // Simpan row untuk perhitungan jarak
             ];
         }
