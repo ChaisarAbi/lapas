@@ -2,48 +2,36 @@
 
 ## Informasi Update
 **Branch:** `implementasi-anp`  
-**Commit:** `273efaf`  
-**Tanggal:** 1 Februari 2026  
-**Perubahan:** Implementasi revisi sistem berdasarkan permintaan dosen
+**Commit:** `7015e80`  
+**Tanggal:** 3 Februari 2026  
+**Perubahan:** Implementasi algoritma TOPSIS untuk perhitungan ranking narapidana dan konsistensi across all views
 
 ## Fitur yang Diperbarui
 
-### 1. Menu Pairwise Comparison (TPP)
-- Pilih subkriteria yang dipengaruhi dulu
-- Input satu persatu subkriteria yang mempengaruhi (skala 1-9)
+### 1. Perhitungan Ranking TOPSIS Konsisten
+- **Algoritma TOPSIS Standar** - Diimplementasikan dengan benar sesuai metode TOPSIS standar
+- **Konsistensi Across Views** - Semua view yang menampilkan ranking (validasi, preview cetak, cetak laporan) now use the same TOPSIS implementation
+- **Perhitungan Akurat** - Handle berbagai kasus khusus (semua nilai sama, division by zero, data kosong)
 
-### 2. Menu Kelola Kriteria (TPP)
-- Tidak perlu input bobot dan jenis kriteria
-- Kriteria nilainya setara, hanya untuk pengelompokan subkriteria
-- Bobot untuk TOPSIS diambil dari bobot global subkriteria
+### 2. Fitur Utama yang Diubah
+- **KalapasController** - Added `hitungTOPSIS` method (mirroring RankingController)
+- **Validasi View** - Uses TOPSIS instead of simple ranking
+- **Preview Cetak View** - Uses TOPSIS instead of simple ranking  
+- **Cetak Laporan View** - Uses TOPSIS instead of simple ranking
+- **RankingController** - Updated TOPSIS method to be consistent with RankingController
 
-### 3. Detail Perhitungan
-- Tambah detail perhitungan metode ANP (TPP)
-- Tambah detail perhitungan metode TOPSIS (BIMKES)
+### 3. Detail Perhitungan TOPSIS
+- **Matriks Keputusan** - Menghitung rata-rata nilai per kriteria dari subkriteria
+- **Normalisasi** - Normalisasi matriks keputusan dengan metode euclidean
+- **Matriks Terbobot** - Menggunakan bobot kriteria dari database
+- **Solusi Ideal** - Menentukan solusi ideal positif dan negatif per kriteria
+- **Perhitungan Jarak** - Hitung jarak ke solusi ideal positif (D+) dan negatif (D-)
+- **Nilai Preferensi** - Menghitung Ci = D-/(D+ + D-) sebagai indikator preferensi
 
-### 4. Menu Kelola Periode
-- Dipindah dari TPP ke Admin
-
-### 5. Perhitungan TOPSIS
-- Tidak perlu menu perhitungan TOPSIS terpisah
-- Sudah ada di manajemen laporan (admin)
-
-### 6. Format Validasi Hasil
-- Sama dengan manajemen laporan admin (kalapas) + status
-- Status remisi:
-  - Nilai preferensi (Ci): ≥0.8500 → Status: Remisi Penuh
-  - Nilai preferensi (Ci): ≥0.7500 → Status: Remisi Separuh  
-  - Nilai preferensi (Ci): <0.7500 → Status: Tidak Layak Remisi
-
-### 7. Manajemen Laporan (Admin)
-- Narapidana terbaik → Remisi Penuh
-- Rata-rata → Remisi Separuh
-- Perlu perhatian → Tidak Layak
-
-### 8. Menu Admin Baru
-- Kelola Admin, TPP, BIMKES, Kalapas, Wali secara terpisah (tampilan saja)
-- Semua mengarah ke satu tempat: `/admin/users`
-- Admin bisa kelola kriteria, subkriteria, dan melihat hasil ANP
+### 4. Status Remisi Perbaikan
+- **Remisi Penuh** - Nilai preferensi ≥ 0.8500
+- **Remisi Separuh** - Nilai preferensi ≥ 0.7500  
+- **Tidak Layak Remisi** - Nilai preferensi < 0.7500
 
 ## Langkah-langkah Update di VPS
 
@@ -159,27 +147,20 @@ sudo chown -R www-data:www-data writable/
 ## Testing Setelah Update
 
 ### 1. Login sebagai Admin
-- Cek menu baru di sidebar admin
-- Test kelola user dengan menu terpisah
-- Test akses kriteria, subkriteria, hasil ANP
+- Test menu laporan (dapat melihat hasil TOPSIS)
+- Test cetak laporan (seharusnya konsisten dengan preview)
 
-### 2. Login sebagai TPP
-- Test pairwise comparison
-- Test kelola kriteria (tanpa input bobot)
-- Test hasil ANP
+### 2. Login sebagai Kalapas
+- **Test Validasi** - Buka halaman validasi, pastikan ranking terurut benar
+- **Test Status Remisi** - Periksa apakah status remisi muncul sesuai nilai preferensi
+- **Test Preview Cetak** - Buka preview cetak, pastikan ranking sama dengan halaman validasi
+- **Test Cetak Laporan** - Cetak laporan, pastikan nilai preferensi sama
 
-### 3. Login sebagai BIMKES
-- Test input penilaian
-- Test detail perhitungan TOPSIS
+### 3. Login sebagai Wali
+- Test dashboard dan hasil penilaian
 
-### 4. Login sebagai Kalapas
-- Test validasi hasil
-- Test status remisi
-- Test cetak laporan
-
-### 5. Login sebagai Wali
-- Test ranking dengan perhitungan sederhana
-- Test hasil penilaian
+### 4. Login sebagai TPP
+- Test pairwise comparison dan hasil ANP
 
 ## Rollback Plan
 Jika ada masalah serius:
@@ -210,7 +191,19 @@ Jika ada masalah, hubungi:
 
 ---
 **Update berhasil jika:**
-- Semua menu baru muncul
+- Ranking di halaman validasi, preview cetak, dan cetak laporan **sama**
+- Status remisi muncul dengan benar
 - Tidak ada error di log
 - Semua fitur berfungsi normal
-- Status remisi muncul dengan benar
+
+## Perbedaan dengan Update Sebelumnya
+
+**Update 3 Februari 2026 (TOPSIS):**
+- Semua perhitungan ranking now use TOPSIS (sebelumnya: mix between simple ranking and TOPSIS)
+- Konsistensi hasil ranking across semua view
+- Perhitungan lebih akurat dan sesuai dengan metode standar
+
+**Update Sebelumnya (1 Februari 2026):**
+- Revisi menu structure dan fitur utama
+- Implementasi pairwise comparison target-first
+- Manajemen user terpisah per role
