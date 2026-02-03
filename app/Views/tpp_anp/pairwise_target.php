@@ -403,15 +403,22 @@ $activeMenu = 'anp_pairwise';
                                                     </select>
                                                 </div>
                                                 <div class="col-md-4 mb-3">
-                                                    <label>Node Ke</label>
+                                                    <label>Node Ke (Influencer)</label>
                                                     <select class="form-control" name="node_ke" required>
-                                                        <option value="">Pilih node ke...</option>
-                                                        <?php foreach ($matrix_data['influencers'] ?? [] as $influencer): ?>
-                                                            <option value="<?= $influencer['id'] ?>">
-                                                                <?= esc($influencer['kode']) ?> - <?= esc($influencer['nama']) ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
+                                                        <option value="">Pilih influencer node...</option>
+                                                        <?php if (isset($matrix_data['influencers']) && !empty($matrix_data['influencers'])): ?>
+                                                            <?php foreach ($matrix_data['influencers'] as $influencer): ?>
+                                                                <option value="<?= $influencer['id'] ?>">
+                                                                    <?= esc($influencer['kode']) ?> - <?= esc($influencer['nama']) ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        <?php else: ?>
+                                                            <option value="">Tidak ada influencer</option>
+                                                        <?php endif; ?>
                                                     </select>
+                                                    <div class="form-text text-muted">
+                                                        Pilih node yang mempengaruhi target <?= esc($selected_target['kode']) ?>
+                                                    </div>
                                                 </div>
                                                 <div class="col-md-4 mb-3">
                                                     <label>Skala (1-9)</label>

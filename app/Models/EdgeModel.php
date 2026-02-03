@@ -37,31 +37,29 @@ class EdgeModel extends Model
     protected $cleanValidationRules = true;
 
     /**
-     * Get influencers by target node
+     * Get nodes that influence a target node (to_node -> target_node)
+     * 
+     * @param int $targetNodeId
+     * @param int|null $periodeId
+     * @return array
      */
-    public function getInfluencersByTarget($targetNodeId, $periodeId = null)
+    public function getInfluencerNodes($targetNodeId, $periodeId = null)
     {
-        $builder = $this->where('to_node_id', $targetNodeId);
+        $db = \Config\Database::connect();
+        $builder = $db->table('anp_edges e')
+            ->select('s.id, s.kode, s.nama, s.kriteria_id, k.nama as kriteria_nama')
+            ->join('subkriteria s', 's.id = e.to_node_id')
+            ->join('kriteria k', 'k.id = s.kriteria_id')
+            ->where('e.from_node_id', $targetNodeId);
         
         if ($periodeId) {
-            $builder->where('periode_id', $periodeId);
+            $builder->where('e.periode_id', $periodeId);
         }
         
-        return $builder->findAll();
-    }
-
-    /**
-     * Get targets by influencer node
-     */
-    public function getTargetsByInfluencer($influencerNodeId, $periodeId = null)
-    {
-        $builder = $this->where('from_node_id', $influencerNodeId);
+        $builder->orderBy('s.kriteria_id', 'ASC')
+                ->orderBy('s.kode', 'ASC');
         
-        if ($periodeId) {
-            $builder->where('periode_id', $periodeId);
-        }
-        
-        return $builder->findAll();
+        return $builder->get()->getResultArray();
     }
 
     /**
@@ -155,28 +153,6 @@ class EdgeModel extends Model
         }
 
         return $saved;
-    }
-
-    /**
-     * Get influencer nodes for target (with node details) - optimized
-     */
-    public function getInfluencerNodes($targetNodeId, $periodeId = null)
-    {
-        $db = \Config\Database::connect();
-        $builder = $db->table('anp_edges e')
-            ->select('s.id, s.kode, s.nama, s.kriteria_id, k.nama as kriteria_nama')
-            ->join('subkriteria s', 's.id = e.from_node_id')
-            ->join('kriteria k', 'k.id = s.kriteria_id')
-            ->where('e.to_node_id', $targetNodeId);
-        
-        if ($periodeId) {
-            $builder->where('e.periode_id', $periodeId);
-        }
-        
-        $builder->orderBy('s.kriteria_id', 'ASC')
-                ->orderBy('s.kode', 'ASC');
-        
-        return $builder->get()->getResultArray();
     }
 
     /**

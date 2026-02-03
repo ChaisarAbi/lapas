@@ -110,41 +110,120 @@ class TppAnpController extends BaseController
             
         if ($selectedTarget) {
             // Bangun matrix untuk target ini menggunakan edges
-            $matrixData = $this->buildMatrixForTargetWithEdges($selectedTargetId, $periodeId, $subkriteria);
+            // Gunakan getInfluencerNodes untuk mendapatkan nodes yang mempengaruhi target
+            $edgeModel = new EdgeModel();
+            $influencerEdges = $edgeModel->getInfluencerNodes($selectedTargetId, $periodeId);
             
-            // Hitung apakah matrix sudah lengkap
-            if ($matrixData && !empty($matrixData['influencers'])) {
-                $k = count($matrixData['influencers']);
-                $totalPairs = $k * ($k - 1) / 2; // Unique pairs (upper triangle)
-                $filledPairs = $matrixData['filled_pairs'];
-                $isComplete = ($filledPairs >= $totalPairs && $k >= 2);
+            if (empty($influencerEdges)) {
+                $matrixData = null;
+                $ahpReport = null;
+            } else {
+                // Ekstrak influencer nodes dari edges
+                $influencers = [];
+                $idToIndex = [];
+                $index = 0;
+                foreach ($influencerEdges as $edge) {
+                    $influencers[] = $edge;
+                    $idToIndex[$edge['id']] = $index;
+                    $index++;
+                }
                 
-                // Tambahkan data completeness ke matrixData
-                $matrixData['is_complete'] = $isComplete;
-                $matrixData['k'] = $k;
-                $matrixData['total_pairs'] = $totalPairs;
-                $matrixData['filled_pairs'] = $filledPairs;
-                $matrixData['progress_percentage'] = $totalPairs > 0 ? round(($filledPairs / $totalPairs) * 100, 1) : 0;
-                
-                // Hitung AHP report hanya jika matrix sudah lengkap
-                if ($isComplete && !empty($matrixData['matrix'])) {
-                    try {
-                        $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
-                        if (!$ahpReport) {
-                            log_message('error', 'calculateAhpReport mengembalikan null untuk target ID: ' . $selectedTargetId);
+                if (empty($influencers)) {
+                    $matrixData = null;
+                    $ahpReport = null;
+                } else {
+                    // Buat matriks kosong
+                    $k = count($influencers);
+                    $matrix = array_fill(0, $k, array_fill(0, $k, 0));
+                    
+                    // Ambil pairwise yang sudah ada untuk target ini
+                    $db = \Config\Database::connect();
+                    $pairwiseData = $db->table('anp_pairwise_histori')
+                        ->where('target_node_id', $selectedTargetId)
+                        ->where('periode_id', $periodeId)
+                        ->get()
+                        ->getResultArray();
+                    
+                    // Filter pairwise hanya untuk influencer nodes yang valid
+                    $validInfluencerIds = array_column($influencers, 'id');
+                    $filteredPairwise = [];
+                    
+                    foreach ($pairwiseData as $pairwise) {
+                        // Hanya masukkan pairwise jika kedua node ada di influencer list
+                        if (in_array($pairwise['node_dari_id'], $validInfluencerIds) && 
+                            in_array($pairwise['node_ke_id'], $validInfluencerIds)) {
+                            $filteredPairwise[] = $pairwise;
+                        }
+                    }
+                    
+                    // Isi matrix dari data pairwise yang sudah difilter
+                    foreach ($filteredPairwise as $pairwise) {
+                        $dariIndex = $idToIndex[$pairwise['node_dari_id']] ?? null;
+                        $keIndex = $idToIndex[$pairwise['node_ke_id']] ?? null;
+                        
+                        if ($dariIndex !== null && $keIndex !== null) {
+                            $matrix[$dariIndex][$keIndex] = (float)$pairwise['skala'];
+                        }
+                    }
+                    
+                    // Isi diagonal dengan 1
+                    for ($i = 0; $i < $k; $i++) {
+                        $matrix[$i][$i] = 1;
+                        
+                        // Isi nilai kebalikan (reciprocal) jika ada
+                        for ($j = 0; $j < $k; $j++) {
+                            if ($i != $j && $matrix[$i][$j] > 0 && $matrix[$j][$i] == 0) {
+                                $matrix[$j][$i] = 1 / $matrix[$i][$j];
+                            }
+                        }
+                    }
+                    
+                    // Hitung jumlah unique pairs yang sudah terisi
+                    $filledPairs = 0;
+                    for ($i = 0; $i < $k; $i++) {
+                        for ($j = $i + 1; $j < $k; $j++) {
+                            if ($matrix[$i][$j] > 0 || $matrix[$j][$i] > 0) {
+                                $filledPairs++;
+                            }
+                        }
+                    }
+                    
+                    $matrixData = [
+                        'matrix' => $matrix,
+                        'influencers' => $influencers,
+                        'filled_pairs' => $filledPairs
+                    ];
+                    
+                    // Hitung apakah matrix sudah lengkap
+                    $totalPairs = $k * ($k - 1) / 2; // Unique pairs (upper triangle)
+                    $isComplete = ($filledPairs >= $totalPairs && $k >= 2);
+                    
+                    // Tambahkan data completeness ke matrixData
+                    $matrixData['is_complete'] = $isComplete;
+                    $matrixData['k'] = $k;
+                    $matrixData['total_pairs'] = $totalPairs;
+                    $matrixData['filled_pairs'] = $filledPairs;
+                    $matrixData['progress_percentage'] = $totalPairs > 0 ? round(($filledPairs / $totalPairs) * 100, 1) : 0;
+                    
+                    // Hitung AHP report hanya jika matrix sudah lengkap
+                    if ($isComplete && !empty($matrixData['matrix'])) {
+                        try {
+                            $ahpReport = $this->anpModel->calculateAhpReport($matrixData['matrix'], $matrixData['influencers']);
+                            if (!$ahpReport) {
+                                log_message('error', 'calculateAhpReport mengembalikan null untuk target ID: ' . $selectedTargetId);
+                                $ahpReport = null;
+                            }
+                        } catch (\Exception $e) {
+                            log_message('error', 'Error calculateAhpReport untuk target ID ' . $selectedTargetId . ': ' . $e->getMessage());
                             $ahpReport = null;
                         }
-                    } catch (\Exception $e) {
-                        log_message('error', 'Error calculateAhpReport untuk target ID ' . $selectedTargetId . ': ' . $e->getMessage());
+                    } else {
                         $ahpReport = null;
                     }
-                } else {
-                    $ahpReport = null;
                 }
-            } else {
-                $ahpReport = null;
             }
         } else {
+            $matrixData = null;
             $ahpReport = null;
         }
         }
@@ -183,15 +262,10 @@ class TppAnpController extends BaseController
         $idToIndex = [];
         $index = 0;
         foreach ($influencerEdges as $edge) {
-            // Pastikan node influencer ada dalam daftar allSubkriteria
-            foreach ($allSubkriteria as $sub) {
-                if ($sub['id'] == $edge['id']) {
-                    $influencers[] = $sub;
-                    $idToIndex[$sub['id']] = $index;
-                    $index++;
-                    break;
-                }
-            }
+            // $edge already contains subkriteria data from getInfluencerNodes (joined with subkriteria and kriteria)
+            $influencers[] = $edge;
+            $idToIndex[$edge['id']] = $index;
+            $index++;
         }
         
         if (empty($influencers)) {
@@ -345,16 +419,10 @@ class TppAnpController extends BaseController
         }
         
         // Ekstrak influencer nodes dari edges
-        $allSubkriteria = $this->subkriteriaModel->getWithKriteria();
         $influencers = [];
         foreach ($influencerEdges as $edge) {
-            // Pastikan node influencer ada dalam daftar allSubkriteria
-            foreach ($allSubkriteria as $sub) {
-                if ($sub['id'] == $edge['id']) {
-                    $influencers[] = $sub;
-                    break;
-                }
-            }
+            // $edge already contains subkriteria data from getInfluencerNodes (joined with subkriteria and kriteria)
+            $influencers[] = $edge;
         }
         
         if (count($influencers) < 2) {
